@@ -8,6 +8,7 @@ from transformers import DistilBertModel, DistilBertTokenizer, AdamW, get_linear
 import torch
 import numpy as np
 import pandas as pd
+from tqdm import trange
 import seaborn as sns
 from pylab import rcParams
 import matplotlib.pyplot as plt
@@ -51,12 +52,14 @@ else:
 
 RANDOM_SEED = 42
 MAX_LEN = 128
-BATCH_SIZE = 4
+BATCH_SIZE = 8
 EPOCHS = 10
 LR = 2e-5
+MODEL_PATH = 'data/best_model_state.bin'
+CSV_PATH = 'data/result.csv'
 np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = "cpu"#torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 '''
 Note : It is possible to get better performance by using better pretrained language models.
@@ -170,6 +173,58 @@ def eval_model(model,
             losses.append(loss.item())
     return correct_predictions.double() / n_examples, np.mean(losses)
 
+def val2pred(score):
+    val = 'neg'
+    if score > 0.5:
+        val = 'pos'
+    return val
+
+
+def get_predictions(model, data_loader, dump_path='data/pred.csv', n_examples=1):
+    model = model.eval()
+    losses = []
+    correct_predictions = 0
+    review_texts = []
+    predictions = []
+    prediction_probs = []
+    real_values = []
+    with torch.no_grad():
+        for d in data_loader:
+            texts = d["review_text"]
+            input_ids = d["input_ids"].to(device)
+            attention_mask = d["attention_mask"].to(device)
+            targets = d["targets"].to(device)
+            targets = torch.unsqueeze(targets, 1)
+            outputs = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask
+            )
+            _, preds = torch.max(outputs, dim=1)
+            correct_predictions += torch.sum(preds == targets)
+            review_texts.extend(texts)
+            predictions.extend(preds)
+            prediction_probs.extend(outputs)
+            real_values.extend(targets)
+    predictions = torch.stack(predictions).cpu()
+    prediction_probs = torch.stack(prediction_probs).cpu()
+    real_values = torch.stack(real_values).cpu()
+
+    df = pd.DataFrame(columns=['text'])
+    df['text'] = review_texts
+    df['gv'] = torch.flatten(real_values)
+    df['p'] = predictions
+    df['gold_values'] = df.gv.apply(val2pred)
+    df['predictions'] = df.p.apply(val2pred)
+    df = df.drop('gv', 1)
+    df = df.drop('p', 1)
+    df.to_csv(dump_path)
+    print(df)
+    acc = correct_predictions.double() / n_examples
+    print("accuracy = ", acc)
+    #return review_texts, predictions, prediction_probs, real_values
+
+
+
 
 def main():
     print("Hello World")
@@ -206,7 +261,7 @@ def main():
     loss_fn = nn.CrossEntropyLoss().to(device)
     history = defaultdict(list)
     best_accuracy = 0
-    for epoch in range(EPOCHS):
+    for epoch in trange(EPOCHS):
         print(f'Epoch {epoch + 1}/{EPOCHS}')
         print('-' * 10)
         train_acc, train_loss = train_epoch(
@@ -233,8 +288,12 @@ def main():
         history['val_acc'].append(val_acc)
         history['val_loss'].append(val_loss)
         if val_acc > best_accuracy:
-            torch.save(model.state_dict(), 'best_model_state.bin')
+            torch.save(model.state_dict(), MODEL_PATH)
             best_accuracy = val_acc
+
+    model2 = SentimentClassifier()
+    model2.load_state_dict(torch.load(MODEL_PATH))
+    get_predictions(model=model2, data_loader=test_data_loader, dump_path=CSV_PATH, n_examples=len(df_test))
 
 
 if __name__ == "__main__":
