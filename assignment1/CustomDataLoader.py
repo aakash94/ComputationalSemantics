@@ -5,7 +5,6 @@ reading strings and
 converting it into appropriate pytorch tensors.
 '''
 
-from transformers import DistilBertTokenizer
 import torch
 from torch.utils.data import Dataset
 

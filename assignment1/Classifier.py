@@ -1,3 +1,7 @@
+'''
+This is the main network
+'''
+
 import torch.nn as nn
 from transformers import DistilBertModel
 
@@ -15,7 +19,6 @@ class SentimentClassifier(nn.Module):
       input_ids=input_ids,
       attention_mask=attention_mask
     )
-    #_, pooled_output = a
     pooled_output = a[0]
     output = self.drop(pooled_output)
     res = self.out(output)

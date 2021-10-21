@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import numpy as np
 import pandas as pd
 import torch
-from torch import nn
 from torch.utils.data import DataLoader
 from transformers import DistilBertTokenizer
 
@@ -40,9 +38,6 @@ elif EVALUATE_ON_DUMMY:
 else:
     print('You are using the FULL dataset, and testing on the real test data.')
 
-
-
-
 MAX_LEN = 128
 BATCH_SIZE = 1
 LR = 2e-5
@@ -51,10 +46,8 @@ CSV_PATH = 'data/result.csv'
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-# If you encounter memory errors using cuda, try running cpu only. The performance seems reasonable on cpu only
-# device = "cpu"
-
 PRE_TRAINED_MODEL_NAME = 'distilbert-base-uncased'
+
 
 def sentiment_to_score(senti):
     if senti == 'neg':
@@ -62,8 +55,8 @@ def sentiment_to_score(senti):
     else:
         return 1
 
-def create_data_loader(df, tokenizer, max_len=256, batch_size=8):
 
+def create_data_loader(df, tokenizer, max_len=256, batch_size=8):
     ds = CustomDataLoader(reviews=df.text.to_numpy(),
                           targets=df.targets.to_numpy(),
                           tokenizer=tokenizer,
@@ -71,11 +64,13 @@ def create_data_loader(df, tokenizer, max_len=256, batch_size=8):
 
     return DataLoader(ds, batch_size=batch_size, num_workers=1)
 
+
 def val2pred(score):
     val = 'neg'
     if score > 0.5:
         val = 'pos'
     return val
+
 
 def get_predictions(model, data_loader, dump_path='data/pred.csv', n_examples=1):
     model = model.eval()
@@ -118,14 +113,14 @@ def get_predictions(model, data_loader, dump_path='data/pred.csv', n_examples=1)
     print(df)
     acc = correct_predictions.double() / n_examples
     print("accuracy = ", acc)
-    #return review_texts, predictions, prediction_probs, real_values
+    # return review_texts, predictions, prediction_probs, real_values
+
 
 def main():
     print("Hello World")
-    # read files
+
     df_test = pd.read_csv(CSV_TEST)
 
-    # turn 'pos' and 'neg' to numeric values
     df_test['targets'] = df_test.sentiment.apply(sentiment_to_score)
 
     tokenizer = DistilBertTokenizer.from_pretrained(PRE_TRAINED_MODEL_NAME)
