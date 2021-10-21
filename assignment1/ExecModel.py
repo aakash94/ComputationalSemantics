@@ -112,7 +112,7 @@ def get_predictions(model, data_loader, dump_path='data/pred.csv', n_examples=1)
     df.to_csv(dump_path)
     print(df)
     acc = correct_predictions.double() / n_examples
-    print("accuracy = ", acc)
+    print("accuracy = ", acc.item())
     # return review_texts, predictions, prediction_probs, real_values
 
 
