@@ -20,6 +20,15 @@ class TreeParse:
         '''
         self.conllu_data = open(conllu_path, "r", encoding="utf-8")
 
+    def print_all_lines(self):
+        '''
+        You may use this to explore the conllu file.
+        :return: Nothing
+        :rtype: None
+        '''
+        for sentence in parse_incr(self.conllu_data):
+            print(sentence.metadata['text'])
+
     def get_lines(self, word="also", max_count=128, compare_lowercase=True, compare_title=True, compare_uppercase=True):
         '''
         :param word: The word to be searched in the sentence
@@ -66,6 +75,9 @@ def demo():
 
     # To use, create an instance of the class, and pass the path to the CONLLU file
     tp = TreeParse(conllu_path=CONLLU_PATH)
+
+    # To view all the lines in the file
+    # tp.print_all_lines()
 
     # To get lines containing the word, simply pass the word to the get_lines word.
     sentence_list = tp.get_lines(word=WORD)

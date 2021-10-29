@@ -123,6 +123,8 @@ def get_WordNet_relation(word1, word2):
             elif synset1 in synset2.part_holonyms():
                 return print(f'{synset1} has {synset2} as a part.')
             # check antonyms:
+           elif any([a in synset1.lemmas() for a in synset2.lemmas()[0].antonyms()]):
+                return print(f'{word1} and {word2} are antonyms')
             # check derivations:
     return print(f'I did not find a lexical relationship between {word1} and {word2} in WordNet')
 
