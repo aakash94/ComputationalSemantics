@@ -94,33 +94,13 @@ class TreeParse:
 
             target_sentence = last7[3]
 
-            if target_sentence.filter(form=word).__len__() > 0:
+            if target_sentence.filter(lemma=word).__len__() > 0:
                 l_before, l_after = self.get_context_lines(last7)
                 sentence_string = self.remove_tabs(target_sentence.metadata['text'])
                 sentence_list.append(sentence_string)
                 context_before_list.append(l_before)
                 context_after_list.append(l_after)
-
-            elif compare_lowercase and target_sentence.filter(form=word.lower()).__len__() > 0:
-                l_before, l_after = self.get_context_lines(last7)
-                sentence_string = self.remove_tabs(target_sentence.metadata['text'])
-                sentence_list.append(sentence_string)
-                context_before_list.append(l_before)
-                context_after_list.append(l_after)
-
-            elif compare_title and target_sentence.filter(form=word.title()).__len__() > 0:
-                l_before, l_after = self.get_context_lines(last7)
-                sentence_string = self.remove_tabs(target_sentence.metadata['text'])
-                sentence_list.append(sentence_string)
-                context_before_list.append(l_before)
-                context_after_list.append(l_after)
-
-            elif compare_uppercase and target_sentence.filter(form=word.upper()).__len__() > 0:
-                l_before, l_after = self.get_context_lines(last7)
-                sentence_string = self.remove_tabs(target_sentence.metadata['text'])
-                sentence_list.append(sentence_string)
-                context_before_list.append(l_before)
-                context_after_list.append(l_after)
+            
 
         self.df['context_before'] = context_before_list
         self.df['target_sentence'] = sentence_list
