@@ -55,6 +55,7 @@ class TreeParse:
 
     def get_lines(self,
                   word="also",
+                  upos_req="verb",
                   max_count=1024,
                   compare_lowercase=True,
                   compare_title=True,
@@ -94,7 +95,7 @@ class TreeParse:
 
             target_sentence = last7[3]
 
-            if target_sentence.filter(lemma=word).__len__() > 0:
+            if target_sentence.filter(lemma=word,upos=upos_req.upper()).__len__() > 0:
                 l_before, l_after = self.get_context_lines(last7)
                 sentence_string = self.remove_tabs(target_sentence.metadata['text'])
                 sentence_list.append(sentence_string)
@@ -132,12 +133,13 @@ def demo():
     print("All the best!\n\n\n")
 
     CONLLU_PATH = "data/Universal Dependencies 2.8.1/ud-treebanks-v2.8/UD_English-GUM/en_gum-ud-test.conllu"
-    WORD = "peppermint"
+    WORD = "result"
+    upos_req="verb"
     OUTPUT_PATH = "data/output.csv"
 
     # To use, create an instance of the class, and pass the path to the CONLLU file
     tp = TreeParse(conllu_path=CONLLU_PATH)
-    tp.get_lines(word=WORD)
+    tp.get_lines(word=WORD,upos_req=upos_req)
     tp.dump_tsv(dump_path=OUTPUT_PATH)
 
 
