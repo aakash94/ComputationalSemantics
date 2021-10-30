@@ -142,7 +142,7 @@ class TreeParse:
         sample_count = min(max_count, df_count)
         sampled_lines = self.df.sample(sample_count)
         sampled_lines.to_csv(dump_path, sep="\t", index=False)
-        print("Dumped ", sample_count, " lines.")
+        print("Dumped ", sample_count, " lines to ",dump_path)
 
 
 def demo():
