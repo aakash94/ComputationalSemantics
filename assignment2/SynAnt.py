@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Nov 21 18:07:29 2021
+
+@author: Audrey
+"""
+
 from gensim.models import Word2Vec
 import nltk
 import gensim
@@ -5,16 +12,9 @@ from nltk.corpus import wordnet
 import random
 import matplotlib.pyplot as plt
 
-WORD2VEC_PATH = "C:\\Users\\Aakash\\AppData\\Roaming\\nltk_data\\models\\word2vec_sample\\pruned.word2vec.txt"
+WORD2VEC_PATH = WORD2VEC_PATH = nltk.data.find('models/word2vec_sample/pruned.word2vec.txt')
 
-
-def get_hyper_hypo(word):
-    hyponyms = []
-    hypernyms = []
-
-    return hypernyms, hyponyms
-
-
+   
 def get_syn_ant(word):
     synonyms = []
     antonyms = []
@@ -105,9 +105,14 @@ def plot_datapoints(datapoints):
 
 def plot_box(datapoints):
     word, syn_score, ant_score, diff = list(zip(*datapoints))
-    plt.boxplot(diff)
+    data=[syn_score,ant_score]
+    plt.boxplot(data)
+    plt.ylabel('Cosine')
+    plt.xticks([1, 2], ["Average Synonym", "Average Antonym"])
     plt.axhline(linewidth=1, color='r')
     plt.show()
+    print('Average Synonym Cosine: ',sum(syn_score)/len(syn_score))
+    print('Average Antonym Cosine: ',sum(ant_score)/len(ant_score))
 
 
 def scratch():
@@ -119,8 +124,9 @@ def scratch():
     datapoints = get_datapoints(model, count=500, verbose=False)
     print("Got Data points")
     print("Plotting Datapoints")
-    # plot_datapoints(datapoints)
+    #plot_datapoints(datapoints)
     plot_box(datapoints)
+
 
 
 if __name__ == "__main__":

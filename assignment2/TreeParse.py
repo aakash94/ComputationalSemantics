@@ -132,7 +132,8 @@ def demo():
     print("The output csv is TAB separated and NOT comma separated")
     print("All the best!\n\n\n")
 
-    CONLLU_PATH = "data/Universal Dependencies 2.8.1/ud-treebanks-v2.8/UD_English-GUM/en_gum-ud-test.conllu"
+    # CONLLU_PATH = "data/Universal Dependencies 2.8.1/ud-treebanks-v2.8/UD_English-GUM/en_gum-ud-test.conllu"
+    CONLLU_PATH = "data/en_gum-ud-test.conllu"
     WORD = "result"
     upos_req="verb"
     OUTPUT_PATH = "data/output.csv"

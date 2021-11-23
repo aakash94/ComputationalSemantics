@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Nov 21 12:55:05 2021
+
+@author: audre
+"""
+
 from gensim.models import Word2Vec
 import nltk
 import gensim
@@ -5,16 +12,16 @@ from nltk.corpus import wordnet
 import random
 import matplotlib.pyplot as plt
 
-WORD2VEC_PATH = "C:\\Users\\Aakash\\AppData\\Roaming\\nltk_data\\models\\word2vec_sample\\pruned.word2vec.txt"
+WORD2VEC_PATH = nltk.data.find('models/word2vec_sample/pruned.word2vec.txt')
 
 
 def get_hypo_hyper(word):
     hyponyms = []
     hypernyms = []
     syn_array = wordnet.synsets(word)
-    if len(syn_array) <= 0:
+    if len(syn_array)<=0:
         return hyponyms, hypernyms
-
+    
     woi = syn_array[0]
     for hyp in woi.hyponyms():
         for l in hyp.lemmas():
@@ -27,7 +34,7 @@ def get_hypo_hyper(word):
     return hyponyms, hypernyms
 
 
-def get_scores(model, word, verbose=False):
+def get_scores(model, word, verbose=True):
     hypo_values = []
     hyper_values = []
     hypo, hyper = get_hypo_hyper(word)
@@ -95,13 +102,16 @@ def plot_datapoints(datapoints):
     plt.legend()
     plt.show()
 
-
 def plot_box(datapoints):
-    word, syn_score, ant_score, diff = list(zip(*datapoints))
-    plt.boxplot(diff)
+    word, hypo_score, hyper_score, diff = list(zip(*datapoints))
+    data=[hypo_score, hyper_score]
+    plt.boxplot(data)
+    plt.ylabel('Cosine')
+    plt.xticks([1, 2], ["Average Hyponym ", "Average Hypernym"])
     plt.axhline(linewidth=1, color='r')
     plt.show()
-
+    print('Average Hyponym Cosine: ',sum(hypo_score)/len(hypo_score))
+    print('Average Hypernym Cosine: ',sum(hyper_score)/len(hypo_score))
 
 def scratch():
     # w = "weapons"
@@ -117,9 +127,8 @@ def scratch():
     datapoints = get_datapoints(model, count=500, verbose=False)
     print("Got Data points")
     print("Plotting Datapoints")
-    # plot_datapoints(datapoints)
+    #plot_datapoints(datapoints)
     plot_box(datapoints)
-
 
 if __name__ == "__main__":
     scratch()
