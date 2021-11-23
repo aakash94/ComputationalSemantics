@@ -6,9 +6,11 @@ from scipy import spatial
 from numpy import dot
 from numpy.linalg import norm
 import pandas as pd
+import scipy.stats as ss
+
 
 RES_PATH = "data/"
-TSV_PATH = RES_PATH+"experiment1-dataset-color-of-concrete-objects.txt"
+TSV_PATH = RES_PATH + "experiment1-dataset-color-of-concrete-objects.txt"
 data_header = ["entity", "colour"]
 BLACK = "black"
 BLUE = "blue"
@@ -23,7 +25,23 @@ WHITE = "white"
 YELLOW = "yellow"
 
 COLOURS = [BLACK, BLUE, BROWN, GREEN, GREY, ORANGE, PINK, PURPLE, RED, WHITE, YELLOW]
-#COLOURS = [BLACK, BLUE, BROWN, GREEN, GREY, ORANGE, PINK, RED, WHITE, YELLOW]
+
+c2i = {
+    BLACK: 0,
+    BLUE: 1,
+    BROWN: 2,
+    GREEN: 3,
+    GREY: 4,
+    ORANGE: 5,
+    PINK: 6,
+    PURPLE: 7,
+    RED: 8,
+    WHITE: 9,
+    YELLOW: 10
+}
+
+
+# COLOURS = [BLACK, BLUE, BROWN, GREEN, GREY, ORANGE, PINK, RED, WHITE, YELLOW]
 
 
 def get_dataset(verbose=False):
@@ -102,7 +120,8 @@ def get_simlarity_scores(word1, word2, tokenizer, model, layers, verbose=False):
     return sim
 
 
-def get_tokenizer_and_model(model_string="bert-base-uncased", tokenizer_string = "bert-base-uncased", output_hidden_States=True):
+def get_tokenizer_and_model(model_string="bert-base-uncased", tokenizer_string="bert-base-uncased",
+                            output_hidden_States=True):
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_string)
     model = AutoModel.from_pretrained(model_string, output_hidden_states=output_hidden_States)
     return tokenizer, model
@@ -118,11 +137,16 @@ def get_colour_vec(word, c2v, tokenizer, model, layers, verbose):
         print(vec)
     return vec
 
-def get_predicted_colour(word, c2v, tokenizer, model, layers, verbose):
+
+def get_predicted_colour(word, c2v, target_colour, tokenizer, model, layers, verbose):
+    rank = 0
     vec = get_colour_vec(word, c2v, tokenizer, model, layers, verbose)
+    ranks = ss.rankdata(vec)
+    rank = ranks[c2i[target_colour]]
+    rank = len(COLOURS)-rank +1
     pos = np.argmax(vec)
     colour = COLOURS[pos]
-    return colour
+    return colour, rank
 
 
 def ex5_old():
@@ -143,8 +167,8 @@ def ex5_old():
     # return word_embedding
 
 
-def ex5(mode = 'bert', verbose = False):
-    target_path = RES_PATH + "ranking_"+mode + ".csv"
+def ex5(mode='bert', verbose=False):
+    target_path = RES_PATH + "ranking_" + mode + ".csv"
     if mode == 'vilbert':
         model_string = 'data/transformers4vl-vilbert'
         layers = [-6, -5, -4, -3, -2, -1]
@@ -154,25 +178,29 @@ def ex5(mode = 'bert', verbose = False):
         layers = [-4, -3, -2, -1]
         # target_path = RES_PATH + "no_purple" + mode + ".csv"
 
-
     df = get_dataset(verbose=verbose)
     list_x = df[data_header[0]].to_list()
     list_y = df[data_header[1]].to_list()
     set_y = set(list_y)
     list_y_pred = []
+    list_rank = []
     tokenizer, model = get_tokenizer_and_model(model_string=model_string, output_hidden_States=True)
     c2v = get_colour_vecs(tokenizer, model, layers)
-    for word in list_x:
-        pred = get_predicted_colour(word, c2v, tokenizer, model, layers, verbose)
+    for count, word in enumerate(list_x):
+        target_colour = list_y[count]
+        pred, rank = get_predicted_colour(word, c2v, target_colour, tokenizer, model, layers, verbose)
         if verbose:
-            print(word,"\t",pred)
+            print(word, "\t", pred, "\t", rank)
         list_y_pred.append(pred)
+        list_rank.append(rank)
     df[mode] = list_y_pred
+    df[rank] = list_rank
 
     df.to_csv(target_path, index=False, sep='\t')
+
 
 if __name__ == '__main__':
     # tokenizer = AutoTokenizer.from_pretrained("data/transformers4vl-vilbert")
     # model = AutoModel.from_pretrained("data/transformers4vl-vilbert")
-    # ex5(mode='vilbert')
+    #ex5(mode='vilbert')
     ex5(mode='bert')
