@@ -1,5 +1,7 @@
 * text=auto
 *.pyc
-assignment1/auxiliary-materials-for-part1/*
-assignment2/data/Universal Dependencies 2.8.1/*
+assignment1/auxiliary-materials-for-part1/
+assignment2/data/Universal Dependencies 2.8.1/
+assignment3/res/semeval2017-task8-dataset/rumoureval-data
 .idea
+.idea/ComputationalSemantics.iml
