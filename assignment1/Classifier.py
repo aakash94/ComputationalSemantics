@@ -15,7 +15,8 @@ class SentimentClassifier(nn.Module):
       input_ids=input_ids,
       attention_mask=attention_mask
     )
-    #_, pooled_output = a
+    # model outputs last_hidden_state , hidden_states , and attentions
+    # we are only need last hidden state
     pooled_output = a[0]
     output = self.drop(pooled_output)
     res = self.out(output)

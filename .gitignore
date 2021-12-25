@@ -5,3 +5,5 @@ assignment2/data/Universal Dependencies 2.8.1/
 assignment3/res/semeval2017-task8-dataset/rumoureval-data
 .idea
 .idea/ComputationalSemantics.iml
+assignment2/data/transformers4vl-vilbert.7z
+assignment2/data/transformers4vl-vilbert/
