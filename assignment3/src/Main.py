@@ -1,5 +1,7 @@
 import os
 import json
+
+'''
 from transformers import DistilBertTokenizer, DistilBertModel
 import torch
 
@@ -18,6 +20,7 @@ def get_embeddings(tweet_string):
     print("type last hs\t", type(last_hidden_states), "\t Size\t", last_hidden_states.size())
     return outputs, last_hidden_states
 
+'''
 
 def load_dicts(preprocessed_path):
     preprocessed_text_path = os.path.join(preprocessed_path, "tweet_texts.json")
@@ -62,7 +65,7 @@ def main():
     print(len(parents_d))
     tweet_id = "529687410611728384"
     view_stuff(tweet_id=tweet_id, text_d=text_d, parents_d=parents_d)
-    get_embeddings(text_d[tweet_id])
+    #get_embeddings(text_d[tweet_id])
 
 
 if __name__ == "__main__":
