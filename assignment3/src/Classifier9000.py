@@ -13,9 +13,11 @@ class GenericClassifier:
         logging.debug("Initializing Generi Classifier")
         self.max_seq_len = 256
         self.res_path = os.path.join("..", "res")
-        self.intent_data_path = os.path.join(self.res_path, "simple_classification_dataset","data", "")
-        self.train_csv_file_path = os.path.join(self.res_path, "simple_classification_dataset", "tmp", "DoNotTouch_Train.csv")
-        self.test_csv_file_path = os.path.join(self.res_path, "simple_classification_dataset", "tmp", "DoNotTouch_Test.csv")
+        self.intent_data_path = os.path.join(self.res_path, "simple_classification_dataset", "data", "")
+        self.train_csv_file_path = os.path.join(self.res_path, "simple_classification_dataset", "tmp",
+                                                "DoNotTouch_Train.csv")
+        self.test_csv_file_path = os.path.join(self.res_path, "simple_classification_dataset", "tmp",
+                                               "DoNotTouch_Test.csv")
         self.model_path = os.path.join(self.res_path, "simple_classification_dataset", "model", "")
         logging.debug("reading classes")
         self.classes = [os.path.splitext(filename)[0] for filename in os.listdir(self.intent_data_path)]
