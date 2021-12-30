@@ -11,14 +11,16 @@ class GenericClassifier:
 
     def __init__(self, seed=42):
         logging.debug("Initializing Generi Classifier")
-        self.max_seq_len = 256
+        self.max_seq_len = 128
         self.res_path = os.path.join("..", "res")
         self.intent_data_path = os.path.join(self.res_path, "simple_classification_dataset", "data", "")
         self.train_csv_file_path = os.path.join(self.res_path, "simple_classification_dataset", "tmp",
                                                 "DoNotTouch_Train.csv")
         self.test_csv_file_path = os.path.join(self.res_path, "simple_classification_dataset", "tmp",
                                                "DoNotTouch_Test.csv")
-        self.model_path = os.path.join(self.res_path, "simple_classification_dataset", "model", "")
+        # self.model_path = os.path.join(self.res_path, "simple_classification_dataset", "model", "")
+        self.model_path = os.path.join(self.res_path, "simple_classification_dataset", "model_balanced", "")
+        # self.model_path = os.path.join(self.res_path, "simple_classification_dataset", "model_unbalanced", "")
         logging.debug("reading classes")
         self.classes = [os.path.splitext(filename)[0] for filename in os.listdir(self.intent_data_path)]
         self.mapping = {k: v for v, k in enumerate(self.classes)}
@@ -51,7 +53,7 @@ class GenericClassifier:
 
             # the line below is a dirty lil hack to balance the classes.
             # Will also lead to faster training because most of the comments will be ignored
-            txt = random.sample(txt, 330)
+            txt = random.sample(txt, 325)
 
             train_l, test_l = train_test_split(txt, test_size=test_size, shuffle=True)
             # intent_l = [c] * len(train_l)
@@ -117,21 +119,6 @@ class GenericClassifier:
 
 
 if __name__ == "__main__":
-    sentences = [
-        "Hello",
-        "asdf asdfasd asdfasd",
-        "sure, it is a good offer",
-        "I want to sell a laptop",
-        "I would like to sell something",
-        "I have a macbook.",
-        "It is a lenovo.",
-        "It has an intel processor",
-        "My asus laptop has an amd processor",
-        "My laptop has an amd processor",
-    ]
-
     gc = GenericClassifier()
     gc.train_model(verbose=True)
     # gc.load_model()
-    # intents = ih.predict(sentences, verbose=True)
-    # print(intents)

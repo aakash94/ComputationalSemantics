@@ -21,14 +21,8 @@ class CustomDataLoader(Dataset):
 
         return parents
 
-    def __getitem__(self, index):
-        tweet_id = self.tweet_ids[index]
+    def get_embeddings_from_id(self, tweet_id):
         tweet_embedding = self.embeddings[tweet_id]
-        label = self.labels[tweet_id]
-        target = self.one_hot_classes[label]
-        # target = np.array(target)
-        # target = torch.FloatTensor(target)
-
         parent_embedding = tweet_embedding
         parent_tweet_ids = self.get_parents(tweet_id)
 
@@ -38,10 +32,17 @@ class CustomDataLoader(Dataset):
             parent_embedding = self.embeddings[parent_tweet_id]
 
         combined_embedding = parent_embedding + tweet_embedding
-        #combined_embedding = np.array(combined_embedding)
+        # combined_embedding = np.array(combined_embedding)
         combined_embedding = torch.FloatTensor(combined_embedding)
+        return combined_embedding
 
-        # Convert into torch Tensor
+    def __getitem__(self, index):
+        tweet_id = self.tweet_ids[index]
+        label = self.labels[tweet_id]
+        target = self.one_hot_classes[label]
+        # target = np.array(target)
+        # target = torch.FloatTensor(target)
+        combined_embedding = self.get_embeddings_from_id(tweet_id)
         return combined_embedding, target
 
     def __len__(self):

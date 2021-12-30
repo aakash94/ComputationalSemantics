@@ -63,7 +63,7 @@ def main():
     text_d, parents_d = load_dicts(preprocessed_path=preprocessed_path)
     print(len(text_d))
     print(len(parents_d))
-    tweet_id = "529687410611728384"
+    tweet_id = "500320061425729536"
     view_stuff(tweet_id=tweet_id, text_d=text_d, parents_d=parents_d)
     #get_embeddings(text_d[tweet_id])
 

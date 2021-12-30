@@ -37,28 +37,7 @@ def load_dicts(preprocessed_path, dataset_path):
     return text_d, parents_d, embeddings_d, dataset_d
 
 
-def get_dataloaders(preprocessed_path, dataset_path, test_fraction=0.2, batch_size=32):
-    text_d, parents_d, embeddings_d, subtask_A = load_dicts(preprocessed_path=preprocessed_path,
-                                                            dataset_path=dataset_path)
-    one_hot_dict = {
-        'comment': [1, 0, 0, 0],
-        'deny': [0, 1, 0, 0],
-        'query': [0, 0, 1, 0],
-        'support': [0, 0, 0, 1]
-    }
-
-    one_hot_dict = {
-        'comment': 0,
-        'deny': 1,
-        'query': 2,
-        'support': 3
-    }
-
-    data_loader = CustomDataLoader(embedding_dict=embeddings_d,
-                                   parent_dict=parents_d,
-                                   label_dict=subtask_A,
-                                   one_hot_dict=one_hot_dict)
-
+def get_dataloaders(data_loader, subtask_A, test_fraction=0.2, batch_size=32):
     dataset_size = len(subtask_A)
     indices = list(range(dataset_size))
     split = int(np.floor(test_fraction * dataset_size))
@@ -83,9 +62,37 @@ class Learner():
         dataset_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev")
         self.state_dict_path = os.path.join("..", "res", "simple_classification_dataset", "custom_model", "chk.pt")
 
+        class_encode = {
+            'comment': [1, 0, 0, 0],
+            'deny': [0, 1, 0, 0],
+            'query': [0, 0, 1, 0],
+            'support': [0, 0, 0, 1]
+        }
 
-        self.train_loader, self.test_loader = get_dataloaders(preprocessed_path=preprocessed_path,
-                                                              dataset_path=dataset_path)
+        class_encode = {
+            'comment': 0,
+            'deny': 1,
+            'query': 2,
+            'support': 3
+        }
+
+        self.class_decode = {
+            0:'comment',
+            1:'deny',
+            2:'query',
+            3:'support'
+        }
+
+        self.text_d, self.parents_d, self.embeddings_d, subtask_A = load_dicts(preprocessed_path=preprocessed_path,
+                                                                               dataset_path=dataset_path)
+
+        self.data_loader = CustomDataLoader(embedding_dict=self.embeddings_d,
+                                            parent_dict=self.parents_d,
+                                            label_dict=subtask_A,
+                                            one_hot_dict=class_encode)
+
+        self.train_loader, self.test_loader = get_dataloaders(data_loader=self.data_loader,
+                                                              subtask_A=subtask_A)
 
         if torch.cuda.is_available():
             self.device = "cuda:0"
@@ -151,13 +158,48 @@ class Learner():
 
     def load_model(self):
         self.model.load_state_dict(torch.load(self.state_dict_path))
+        self.model.to(self.device)
         self.model.eval()
 
+    def get_parents(self, tweet_id):
+        parents = []
+        x = self.parents_d[tweet_id]
+        while x != '':
+            parents.insert(0, x)
+            x = self.parents_d[x]
+
+        return parents
+
     def get_predicion(self, tweet_id):
-        embedding = self.em
+        embedding = self.data_loader.get_embeddings_from_id(tweet_id)
+        embedding = embedding.to(device=self.device)
+        logits = self.model(embedding)
+        output = torch.argmax(logits)
+        output = output.cpu()
+        output = output.item()
+        output = self.class_decode[output]
+        return output
+
+    def evaluate(self, file_path):
+        subtaskA = {}
+        with open(file_path) as json_file:
+            subtaskA = json.load(json_file)
+        tweet_ids = subtaskA.keys()
+        targets = subtaskA.values()
+        preds = [self.get_predicion(x) for x in tweet_ids]
+        correct = sum(x == y for x, y in zip(preds, targets))
+        perc = correct/len(preds)
+        return perc
+
 
 
 if __name__ == "__main__":
     l = Learner(epochs=500)
-    l.learn()
+    #l.learn()
     l.load_model()
+
+    file_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-dev.json")
+    #file_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-train.json")
+
+    c = l.evaluate(file_path=file_path)
+    print("Correct Percentage = \t",c)
