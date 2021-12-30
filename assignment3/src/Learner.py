@@ -2,12 +2,14 @@ import numpy as np
 import torch.nn as nn
 from torch.utils.data.sampler import SubsetRandomSampler
 import os
+import random
 import json
 from Classifier9001 import TweetClassifier
 from DataLoader import CustomDataLoader
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import trange
+from sklearn.model_selection import train_test_split
 
 
 def load_dicts(preprocessed_path, dataset_path):
@@ -37,37 +39,68 @@ def load_dicts(preprocessed_path, dataset_path):
     return text_d, parents_d, embeddings_d, dataset_d
 
 
-def get_dataloaders(data_loader, subtask_A, test_fraction=0.2, batch_size=32):
-    dataset_size = len(subtask_A)
-    indices = list(range(dataset_size))
-    split = int(np.floor(test_fraction * dataset_size))
-    np.random.shuffle(indices)
-    train_indices, val_indices = indices[split:], indices[:split]
-    train_sampler = SubsetRandomSampler(train_indices)
-    test_sampler = SubsetRandomSampler(val_indices)
+def get_indices(task_dict, test_fraction=0.2):
+    keys = list(task_dict.keys())
+    values = list(task_dict.values())
+    comment_l = []
+    deny_l = []
+    query_l = []
+    support_l = []
 
-    train_loader = torch.utils.data.DataLoader(data_loader, batch_size=batch_size,
-                                               sampler=train_sampler)
-    test_loader = torch.utils.data.DataLoader(data_loader, batch_size=batch_size,
-                                              sampler=test_sampler)
+    for index, v in enumerate(values):
+        if v == 'comment':
+            comment_l.append(index)
+        elif v == 'deny':
+            deny_l.append(index)
+        elif v == 'query':
+            query_l.append(index)
+        elif v == 'support':
+            support_l.append(index)
+
+    # Balance datasets
+    min_count = min(len(comment_l), len(deny_l), len(query_l), len(support_l))
+    comment_l = random.sample(comment_l, min_count)
+    deny_l = random.sample(deny_l, min_count)
+    query_l = random.sample(query_l, min_count)
+    support_l = random.sample(support_l, min_count)
+
+    comment_train, comment_test = train_test_split(comment_l, test_size=test_fraction, shuffle=True)
+    deny_train, deny_test = train_test_split(deny_l, test_size=test_fraction, shuffle=True)
+    query_train, query_test = train_test_split(query_l, test_size=test_fraction, shuffle=True)
+    support_train, support_test = train_test_split(support_l, test_size=test_fraction, shuffle=True)
+
+    train_indices = comment_train + deny_train + query_train + support_train
+    test_indices = comment_test + deny_test + query_test + support_test
+
+    print("category\t", len(train_indices), "\t", len(test_indices))
+    print("comment\t", len(comment_train), len(comment_test))
+    print("deny\t", len(deny_train), len(deny_test))
+    print("query\t", len(query_train), len(query_test))
+    print("support\t", len(support_train), len(support_test))
+
+    return train_indices, test_indices
+
+
+def get_dataloaders(data_loader, subtask_A, test_fraction=0.2, batch_size=32):
+    train_indices, test_indices = get_indices(subtask_A, test_fraction=test_fraction)
+
+    train_sampler = SubsetRandomSampler(train_indices)
+    test_sampler = SubsetRandomSampler(test_indices)
+
+    train_loader = torch.utils.data.DataLoader(data_loader, batch_size=batch_size, sampler=train_sampler)
+    test_loader = torch.utils.data.DataLoader(data_loader, batch_size=batch_size, sampler=test_sampler)
 
     return train_loader, test_loader
 
 
 class Learner():
 
-    def __init__(self, epochs=500):
+    def __init__(self, epochs=500, seed=42):
+        self.set_all_seeds(seed=seed)
         self.epochs = epochs
         preprocessed_path = os.path.join("..", "res", "pre_processed")
         dataset_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev")
-        self.state_dict_path = os.path.join("..", "res", "simple_classification_dataset", "custom_model", "chk.pt")
-
-        class_encode = {
-            'comment': [1, 0, 0, 0],
-            'deny': [0, 1, 0, 0],
-            'query': [0, 0, 1, 0],
-            'support': [0, 0, 0, 1]
-        }
+        self.state_dict_path = os.path.join("..", "res", "custom_model", "chk.pt")
 
         class_encode = {
             'comment': 0,
@@ -77,10 +110,10 @@ class Learner():
         }
 
         self.class_decode = {
-            0:'comment',
-            1:'deny',
-            2:'query',
-            3:'support'
+            0: 'comment',
+            1: 'deny',
+            2: 'query',
+            3: 'support'
         }
 
         self.text_d, self.parents_d, self.embeddings_d, subtask_A = load_dicts(preprocessed_path=preprocessed_path,
@@ -100,7 +133,6 @@ class Learner():
             self.device = "cpu"
 
         self.model = TweetClassifier()
-        self.device = torch.device("cuda:0" if torch.cuda.is_available else "cpu")
         self.model.to(self.device)
 
         self.criterion = nn.CrossEntropyLoss()
@@ -139,6 +171,14 @@ class Learner():
             total_loss /= count
 
         return total_loss
+
+    def set_all_seeds(self, seed):
+        # This is for reproducibility.
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        torch.backends.cudnn.deterministic = True
 
     def learn(self):
         writer = SummaryWriter(comment='Veracity')
@@ -188,9 +228,8 @@ class Learner():
         targets = subtaskA.values()
         preds = [self.get_predicion(x) for x in tweet_ids]
         correct = sum(x == y for x, y in zip(preds, targets))
-        perc = correct/len(preds)
+        perc = correct / len(preds)
         return perc
-
 
 
 if __name__ == "__main__":
@@ -199,7 +238,7 @@ if __name__ == "__main__":
     l.load_model()
 
     file_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-dev.json")
-    #file_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-train.json")
+    # file_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-train.json")
 
     c = l.evaluate(file_path=file_path)
-    print("Correct Percentage = \t",c)
+    print("Correct Percentage = \t", c)
