@@ -46,6 +46,14 @@ def get_dataloaders(preprocessed_path, dataset_path, test_fraction=0.2, batch_si
         'query': [0, 0, 1, 0],
         'support': [0, 0, 0, 1]
     }
+
+    one_hot_dict = {
+        'comment': 0,
+        'deny': 1,
+        'query': 2,
+        'support': 3
+    }
+
     data_loader = CustomDataLoader(embedding_dict=embeddings_d,
                                    parent_dict=parents_d,
                                    label_dict=subtask_A,
@@ -73,7 +81,9 @@ class Learner():
         self.epochs = epochs
         preprocessed_path = os.path.join("..", "res", "pre_processed")
         dataset_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev")
-        self.state_dict_path = os.path.join("..", "res","simple_classification_dataset","custom_model","chk.pt")
+        self.state_dict_path = os.path.join("..", "res", "simple_classification_dataset", "custom_model", "chk.pt")
+
+
         self.train_loader, self.test_loader = get_dataloaders(preprocessed_path=preprocessed_path,
                                                               dataset_path=dataset_path)
 
@@ -108,6 +118,8 @@ class Learner():
                 self.optimizer.zero_grad()
 
             output = self.model(x)
+            # output = output.long()
+            y = y.long()
             loss = self.criterion(output, y)
             total_loss += loss.item()
             count += 1
@@ -134,11 +146,18 @@ class Learner():
 
             if test_loss < lowest_test_loss:
                 lowest_test_loss = test_loss
-                torch.save(self.model.state_dict(self.state_dict_path))
+                # https://pytorch.org/tutorials/beginner/saving_loading_models.html#save-load-state-dict-recommended
+                torch.save(self.model.state_dict(), self.state_dict_path)
 
+    def load_model(self):
+        self.model.load_state_dict(torch.load(self.state_dict_path))
+        self.model.eval()
 
+    def get_predicion(self, tweet_id):
+        embedding = self.em
 
 
 if __name__ == "__main__":
-    l = Learner()
+    l = Learner(epochs=500)
     l.learn()
+    l.load_model()

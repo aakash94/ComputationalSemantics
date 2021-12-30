@@ -1,5 +1,6 @@
 import numpy as np
 from torch.utils.data import Dataset
+import torch
 
 
 class CustomDataLoader(Dataset):
@@ -25,7 +26,8 @@ class CustomDataLoader(Dataset):
         tweet_embedding = self.embeddings[tweet_id]
         label = self.labels[tweet_id]
         target = self.one_hot_classes[label]
-        target = np.array(target)
+        # target = np.array(target)
+        # target = torch.FloatTensor(target)
 
         parent_embedding = tweet_embedding
         parent_tweet_ids = self.get_parents(tweet_id)
@@ -36,9 +38,10 @@ class CustomDataLoader(Dataset):
             parent_embedding = self.embeddings[parent_tweet_id]
 
         combined_embedding = parent_embedding + tweet_embedding
-        combined_embedding = np.array(combined_embedding)
+        #combined_embedding = np.array(combined_embedding)
+        combined_embedding = torch.FloatTensor(combined_embedding)
 
-        # Convert into toch Tensor
+        # Convert into torch Tensor
         return combined_embedding, target
 
     def __len__(self):
