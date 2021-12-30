@@ -195,7 +195,7 @@ class Learner():
 
 if __name__ == "__main__":
     l = Learner(epochs=500)
-    #l.learn()
+    l.learn()
     l.load_model()
 
     file_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-dev.json")

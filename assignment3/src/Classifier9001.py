@@ -9,8 +9,8 @@ class TweetClassifier(nn.Module):
         # 1 vector for reply and one for parent
         input_size = tweet_embedding_dime*2
 
-        self.fc1  = nn.Linear(input_size, 128)
-        self.fc2 = nn.Linear(128, num_classes)
+        self.fc1  = nn.Linear(input_size, 64)
+        self.fc2 = nn.Linear(64, num_classes)
 
     def forward(self, x):
         x = self.fc1(x)
