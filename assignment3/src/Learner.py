@@ -211,6 +211,8 @@ class Learner():
         return parents
 
     def get_predicion(self, tweet_id):
+        if tweet_id not in self.embeddings_d:
+            return ""
         embedding = self.data_loader.get_embeddings_from_id(tweet_id)
         embedding = embedding.to(device=self.device)
         logits = self.model(embedding)
