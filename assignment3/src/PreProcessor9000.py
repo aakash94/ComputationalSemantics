@@ -40,20 +40,27 @@ def cleanify_tweet(tweet, id, parent_id = "", subtasks=None):
 
     clean_tweet = " ".join(clean_tweet.split())
 
+
+    # print("Mentions =\t", mentions)
+    split_mentions = camelcase_split(mentions)
+    # print("Split Mentions =\t", split_mentions)
+
+    # print("Hashtags =\t", hashtags)
+    split_hashtags = camelcase_split(hashtags)
+    # print("Split Hashtags =\t",split_hashtags)
+    # print("urls =\t", urls)
+    clean_list = split_mentions + split_hashtags
+    clean_list_tweet = ". ".join(clean_list)
+
+
+
     if len(clean_tweet )<=0:
         print("\n..............")
         category = subtasks[id]
         print(id, "\t",category ,"root: ", parent_id, "\n",tweet)
+        print("clean tweet\t", clean_list_tweet)
 
-        print("Mentions =\t", mentions)
-        split_mentions = camelcase_split(mentions)
-        print("Split Mentions =\t", split_mentions)
-
-        print("Hashtags =\t", hashtags)
-        split_hashtags = camelcase_split(hashtags)
-        print("Split Hashtags =\t",split_hashtags)
-        # print("urls =\t", urls)
-        clean_tweet = "."
+    clean_tweet = clean_tweet + clean_list_tweet
 
 
     return clean_tweet
