@@ -257,6 +257,5 @@ if __name__ == "__main__":
     print("Correct Percentage = \t", c)
     x = l.create_db(file_path=file_path)
     print(pd.crosstab(x['Label'], x['Prediction'], margins = True))
-    print(accuracy_score(x['Label'],x['Prediction']))
     print('Precision: ', precision_score(x['Label'],x['Prediction'],average = None))
     print('Recall: ',recall_score(x['Label'],x['Prediction'],average = None))
