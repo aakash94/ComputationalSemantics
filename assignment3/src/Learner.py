@@ -10,7 +10,8 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import trange
 from sklearn.model_selection import train_test_split
-
+from sklearn.metrics import recall_score, precision_score
+import pandas as pd
 
 def load_dicts(preprocessed_path, dataset_path):
     preprocessed_text_path = os.path.join(preprocessed_path, "tweet_texts.json")
@@ -232,6 +233,16 @@ class Learner():
         correct = sum(x == y for x, y in zip(preds, targets))
         perc = correct / len(preds)
         return perc
+    
+    def create_db(self, file_path):
+        subtaskA = {}
+        with open(file_path) as json_file:
+            subtaskA = json.load(json_file)
+        tweet_ids = subtaskA.keys()
+        df = pd.DataFrame(subtaskA.items(), columns = ['ID','Label'])
+        preds = [self.get_predicion(x) for x in tweet_ids]
+        df['Prediction']=preds
+        return df
 
 
 if __name__ == "__main__":
@@ -244,3 +255,8 @@ if __name__ == "__main__":
 
     c = l.evaluate(file_path=file_path)
     print("Correct Percentage = \t", c)
+    x = l.create_db(file_path=file_path)
+    print(pd.crosstab(x['Label'], x['Prediction'], margins = True))
+    print(accuracy_score(x['Label'],x['Prediction']))
+    print('Precision: ', precision_score(x['Label'],x['Prediction'],average = None))
+    print('Recall: ',recall_score(x['Label'],x['Prediction'],average = None))
