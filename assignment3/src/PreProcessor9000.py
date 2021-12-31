@@ -6,6 +6,14 @@ import re
 import errno
 
 
+def camelcase_split(list_string):
+    splits = []
+    for s in list_string:
+        splt = re.findall(r'[A-Z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))', s)
+        recombined = " ".join(splt) if len(splt)>0 else s
+        splits.append(recombined)
+    return splits
+
 def silentremove(filename):
     try:
         os.remove(filename)
@@ -14,16 +22,20 @@ def silentremove(filename):
 
 def cleanify_tweet(tweet, id, parent_id = "", subtasks=None):
 
-    # remove @mentions
     if subtasks is None:
         subtasks = defaultdict(str)
 
-    clean_tweet = re.sub("@[A-Za-z0-9_]+", "", tweet)
+    clean_tweet = tweet
+    # remove @mentions
+    mentions = re.findall("@([a-zA-Z0-9_]{1,50})", clean_tweet)
+    clean_tweet = re.sub("@[A-Za-z0-9_]+", "", clean_tweet)
 
     # remove #hashtags
+    hashtags = re.findall("#([a-zA-Z0-9_]{1,50})", clean_tweet)
     clean_tweet = re.sub("#[A-Za-z0-9_]+", "", clean_tweet)
 
     # remove http:// urls
+    # urls = re.findall(r'http\S{1,50}', "", tweet)
     clean_tweet = re.sub(r'http\S+', "", clean_tweet)
 
     clean_tweet = " ".join(clean_tweet.split())
@@ -32,6 +44,15 @@ def cleanify_tweet(tweet, id, parent_id = "", subtasks=None):
         print("\n..............")
         category = subtasks[id]
         print(id, "\t",category ,"root: ", parent_id, "\n",tweet)
+
+        print("Mentions =\t", mentions)
+        split_mentions = camelcase_split(mentions)
+        print("Split Mentions =\t", split_mentions)
+
+        print("Hashtags =\t", hashtags)
+        split_hashtags = camelcase_split(hashtags)
+        print("Split Hashtags =\t",split_hashtags)
+        # print("urls =\t", urls)
         clean_tweet = "."
 
 
@@ -135,8 +156,11 @@ if __name__ == "__main__":
 
 
     main(cleanup=True, subtasks=subtasks)
-    # tweet = "asdf @sf @sdfs #dfdf #s works \n@sfd \nhttps://t.co this #not stays @atb"
-    # clean = cleanify_tweet(tweet)
-    # print(tweet)
-    # print("...............")
-    # print(clean)
+    '''
+    list_string = ['BreakingNews',
+                   'australian',
+                   'JRCarrollCJ',
+                   'J_francis613',
+                   'COMINT_AU']
+    print(camelcase_split(list_string))
+    '''
