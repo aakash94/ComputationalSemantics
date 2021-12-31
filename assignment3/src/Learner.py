@@ -12,6 +12,9 @@ from tqdm import trange
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import recall_score, precision_score
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sn
+
 
 def load_dicts(preprocessed_path, dataset_path):
     preprocessed_text_path = os.path.join(preprocessed_path, "tweet_texts.json")
@@ -82,7 +85,7 @@ def get_indices(task_dict, test_fraction=0.2):
     return train_indices, test_indices
 
 
-def get_dataloaders(data_loader, subtask_A, test_fraction=0.2, batch_size=32):
+def get_dataloaders(data_loader, subtask_A, test_fraction=0.05, batch_size=256):
     train_indices, test_indices = get_indices(subtask_A, test_fraction=test_fraction)
 
     train_sampler = SubsetRandomSampler(train_indices)
@@ -125,8 +128,7 @@ class Learner():
                                             label_dict=subtask_A,
                                             one_hot_dict=class_encode)
 
-        self.train_loader, self.test_loader = get_dataloaders(data_loader=self.data_loader,
-                                                              subtask_A=subtask_A)
+        self.train_loader, self.test_loader = get_dataloaders(data_loader=self.data_loader, subtask_A=subtask_A)
 
         if torch.cuda.is_available():
             self.device = "cuda:0"
@@ -246,8 +248,8 @@ class Learner():
 
 
 if __name__ == "__main__":
-    l = Learner(epochs=500)
-    l.learn()
+    l = Learner(epochs=100)
+    #l.learn()
     l.load_model()
 
     file_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-dev.json")
@@ -255,7 +257,12 @@ if __name__ == "__main__":
 
     c = l.evaluate(file_path=file_path)
     print("Correct Percentage = \t", c)
+
     x = l.create_db(file_path=file_path)
+
     print(pd.crosstab(x['Label'], x['Prediction'], margins = True))
     print('Precision: ', precision_score(x['Label'],x['Prediction'],average = None))
     print('Recall: ',recall_score(x['Label'],x['Prediction'],average = None))
+
+    sn.heatmap(pd.crosstab(x['Label'], x['Prediction']), annot=True)
+    plt.show()
