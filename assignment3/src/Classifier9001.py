@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class TweetClassifier(nn.Module):
-    def __init__(self, tweet_embedding_dime = 384, num_classes = 4):
+    def __init__(self, tweet_embedding_dime = 768, num_classes = 4):
         super(TweetClassifier, self).__init__()
 
         # 1 vector for reply and one for parent

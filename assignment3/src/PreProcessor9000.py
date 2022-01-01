@@ -65,11 +65,11 @@ def cleanify_tweet(tweet, id, parent_id = "", subtasks=None):
 
     return clean_tweet
 
-
 def pre_process(folder_path, cleanup=False, subtasks=None):
     if subtasks is None:
         subtasks = defaultdict(str)
-    model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+    # model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
     tweet_text_dict = {}
     tweet_parent_dict = {}
     tweet_embedding_dict = {}
@@ -162,7 +162,7 @@ if __name__ == "__main__":
     subtasks.update(subtask2)
 
 
-    main(cleanup=True, subtasks=subtasks)
+    main(cleanup=False, subtasks=subtasks)
     '''
     list_string = ['BreakingNews',
                    'australian',

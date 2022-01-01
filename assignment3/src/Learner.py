@@ -63,7 +63,7 @@ def get_indices(task_dict, test_fraction=0.2):
 
     # Balance datasets
     min_count = min(len(comment_l), len(deny_l), len(query_l), len(support_l))
-    comment_l = random.sample(comment_l, min_count)
+    comment_l = random.sample(comment_l, min_count*2)
     deny_l = random.sample(deny_l, min_count)
     query_l = random.sample(query_l, min_count)
     support_l = random.sample(support_l, min_count)
@@ -249,7 +249,7 @@ class Learner():
 
 if __name__ == "__main__":
     l = Learner(epochs=100)
-    #l.learn()
+    l.learn()
     l.load_model()
 
     file_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-dev.json")
