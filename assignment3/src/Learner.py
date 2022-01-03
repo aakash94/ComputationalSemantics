@@ -16,6 +16,13 @@ import matplotlib.pyplot as plt
 import seaborn as sn
 
 
+def silentremove(filename):
+    try:
+        os.remove(filename)
+    except:
+        print("No file found to remove! No issues. Hopefully.")
+
+
 def load_dicts(preprocessed_path, dataset_path):
     preprocessed_text_path = os.path.join(preprocessed_path, "tweet_texts.json")
     preprocessed_parents_path = os.path.join(preprocessed_path, "tweet_parents.json")
@@ -63,7 +70,7 @@ def get_indices(task_dict, test_fraction=0.2):
 
     # Balance datasets
     min_count = min(len(comment_l), len(deny_l), len(query_l), len(support_l))
-    comment_l = random.sample(comment_l, min_count*2)
+    comment_l = random.sample(comment_l, min_count * 2)
     deny_l = random.sample(deny_l, min_count)
     query_l = random.sample(query_l, min_count)
     support_l = random.sample(support_l, min_count)
@@ -225,26 +232,56 @@ class Learner():
         output = self.class_decode[output]
         return output
 
-    def evaluate(self, file_path):
+    def evaluate(self, file_path, dump_path):
         subtaskA = {}
         with open(file_path) as json_file:
             subtaskA = json.load(json_file)
         tweet_ids = subtaskA.keys()
         targets = subtaskA.values()
-        preds = [self.get_predicion(x) for x in tweet_ids]
+        pred_d = {x: self.get_predicion(x) for x in tweet_ids}
+
+        silentremove(dump_path)
+        with open(dump_path, 'w') as outfile:
+            json.dump(pred_d, outfile)
+
+        preds = list(pred_d.values())
         correct = sum(x == y for x, y in zip(preds, targets))
         perc = correct / len(preds)
         return perc
-    
+
     def create_db(self, file_path):
         subtaskA = {}
         with open(file_path) as json_file:
             subtaskA = json.load(json_file)
         tweet_ids = subtaskA.keys()
-        df = pd.DataFrame(subtaskA.items(), columns = ['ID','Label'])
+        df = pd.DataFrame(subtaskA.items(), columns=['ID', 'Label'])
         preds = [self.get_predicion(x) for x in tweet_ids]
-        df['Prediction']=preds
+        df['Prediction'] = preds
         return df
+
+
+def official_evaluation(reference_file, submission_file):
+    truth_values = json.load(open(reference_file, 'r'))
+    submission = json.load(open(submission_file, 'r'))
+
+    observed = 0
+    correct = 0
+    total = len(truth_values.keys())
+    print(len(truth_values), 'entries in reference file')
+    for reference_id in truth_values.keys():
+        if reference_id in submission.keys():
+            observed += 1
+            if submission[reference_id] == truth_values[reference_id]:
+                correct += 1
+        else:
+            print('unmatched entry:', reference_id, '-- no reference value for this document')
+
+    score = correct / total
+
+    print(observed, 'matched entries in submission')
+    print(total, 'entries in reference file')
+
+    print('sdqc accuracy:', score)
 
 
 if __name__ == "__main__":
@@ -254,15 +291,17 @@ if __name__ == "__main__":
 
     file_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-dev.json")
     # file_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-train.json")
+    dump_path = os.path.join("..", "res", "predictions.json")
+    reference_path = os.path.join("..", "res", "subtaska.json")
 
-    c = l.evaluate(file_path=file_path)
+    c = l.evaluate(file_path=file_path, dump_path=dump_path)
     print("Correct Percentage = \t", c)
 
     x = l.create_db(file_path=file_path)
 
-    print(pd.crosstab(x['Label'], x['Prediction'], margins = True))
-    print('Precision: ', precision_score(x['Label'],x['Prediction'],average = None))
-    print('Recall: ',recall_score(x['Label'],x['Prediction'],average = None))
+    print(pd.crosstab(x['Label'], x['Prediction'], margins=True))
+    print('Precision: ', precision_score(x['Label'], x['Prediction'], average=None))
+    print('Recall: ', recall_score(x['Label'], x['Prediction'], average=None))
 
     sn.heatmap(pd.crosstab(x['Label'], x['Prediction']), annot=True)
     plt.show()

@@ -9,7 +9,6 @@ import sys
 truth_values = json.load(open(reference_file, 'r'))
 submission = json.load(open(submission_file, 'r'))
 
-
 observed = 0
 correct = 0
 total = len(truth_values.keys())
@@ -17,12 +16,12 @@ total = len(truth_values.keys())
 print(len(truth_values), 'entries in reference file')
 
 for reference_id in truth_values.keys():
-	if reference_id in submission.keys():
-		observed += 1
-		if submission[reference_id] == truth_values[reference_id]:
-			correct += 1
-	else:
-		print('unmatched entry:', reference_id, '-- no reference value for this document')
+    if reference_id in submission.keys():
+        observed += 1
+        if submission[reference_id] == truth_values[reference_id]:
+            correct += 1
+    else:
+        print('unmatched entry:', reference_id, '-- no reference value for this document')
 
 score = correct / total
 
