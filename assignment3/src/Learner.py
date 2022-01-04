@@ -309,7 +309,7 @@ def main():
         c = l.evaluate(file_path=file_path, dump_path=dump_path)
         description = "best : " + str(best_performance) + "\tcurrent : " + str(c)
         progress_bar.set_description(description)
-        print(seed_val, "\t", c)
+        # print(seed_val, "\t", c)
         if c > best_performance:
             best_performance = c
             best_seed = seed_val
