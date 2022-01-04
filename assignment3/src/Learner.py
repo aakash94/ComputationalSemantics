@@ -234,7 +234,7 @@ class Learner():
                 lowest_test_loss = test_loss
                 # https://pytorch.org/tutorials/beginner/saving_loading_models.html#save-load-state-dict-recommended
                 torch.save(self.model.state_dict(), self.state_dict_path)
-                print("Saved in epoch ",e)
+                # print("Saved in epoch ",e)
 
     def load_model(self):
         self.model.load_state_dict(torch.load(self.state_dict_path))
