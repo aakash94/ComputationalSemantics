@@ -10,18 +10,19 @@ def camelcase_split(list_string):
     splits = []
     for s in list_string:
         splt = re.findall(r'[A-Z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))', s)
-        recombined = " ".join(splt) if len(splt)>0 else s
+        recombined = " ".join(splt) if len(splt) > 0 else s
         splits.append(recombined)
     return splits
+
 
 def silentremove(filename):
     try:
         os.remove(filename)
-    except :
+    except:
         print("No file found to remove! No issues. Hopefully.")
 
-def cleanify_tweet(tweet, id, parent_id = "", subtasks=None):
 
+def cleanify_tweet(tweet, id, parent_id="", subtasks=None, verbose = False):
     if subtasks is None:
         subtasks = defaultdict(str)
 
@@ -40,7 +41,6 @@ def cleanify_tweet(tweet, id, parent_id = "", subtasks=None):
 
     clean_tweet = " ".join(clean_tweet.split())
 
-
     # print("Mentions =\t", mentions)
     split_mentions = camelcase_split(mentions)
     # print("Split Mentions =\t", split_mentions)
@@ -52,18 +52,17 @@ def cleanify_tweet(tweet, id, parent_id = "", subtasks=None):
     clean_list = split_mentions + split_hashtags
     clean_list_tweet = ". ".join(clean_list)
 
-
-
-    if len(clean_tweet )<=0:
-        print("\n..............")
-        category = subtasks[id]
-        print(id, "\t",category ,"root: ", parent_id, "\n",tweet)
-        print("clean tweet\t", clean_list_tweet)
+    if len(clean_tweet) <= 0:
+        if verbose:
+            category = subtasks[id]
+            print("\n..............")
+            print(id, "\t", category, "root: ", parent_id, "\n", tweet)
+            print("clean tweet\t", clean_list_tweet)
 
     clean_tweet = clean_tweet + clean_list_tweet
 
-
     return clean_tweet
+
 
 def pre_process(folder_path, cleanup=False, subtasks=None):
     if subtasks is None:
@@ -104,16 +103,27 @@ def pre_process(folder_path, cleanup=False, subtasks=None):
             reply_id = str(reply_json['id'])
             tr_original_str = reply_json['text']
             tr_parent = "" if reply_json['in_reply_to_status_id'] == None else str(reply_json['in_reply_to_status_id'])
-            tr_str = cleanify_tweet(tweet=tr_original_str, id=reply_id, parent_id=tweet_id, subtasks=subtasks) if cleanup else tr_original_str
+            tr_str = cleanify_tweet(tweet=tr_original_str, id=reply_id, parent_id=tweet_id,
+                                    subtasks=subtasks) if cleanup else tr_original_str
             tr_embeddings = model.encode(tr_str).tolist()
+
+            if tr_parent not in tweet_parent_dict:
+                print("Problem tweet ", reply_id, "\t parent", tweet_id, "\t immediate parent ", tr_parent)
+                tr_parent = tweet_id
+
 
             tweet_text_dict[reply_id] = tr_str
             tweet_parent_dict[reply_id] = tr_parent
             tweet_embedding_dict[reply_id] = tr_embeddings
 
+            # problem_id = '553490097623269376'
+            # if problem_id in [tweet_id, reply_id, tp_parent, tr_parent]:
+            #     print("Here is the problem")
+
     return tweet_text_dict, tweet_parent_dict, tweet_embedding_dict
 
-def main(cleanup = False, subtasks=None):
+
+def main(cleanup=False, subtasks=None):
     if subtasks is None:
         subtasks = defaultdict(str)
     data_path = os.path.join("..", "res", "semeval2017-task8-dataset", "rumoureval-data")
@@ -125,7 +135,8 @@ def main(cleanup = False, subtasks=None):
     for rumour_topic in rumour_topics:
         print("Scraping ", rumour_topic)
         rumour_path = os.path.join(data_path, rumour_topic)
-        text_dict, parent_dict, embedding_dict = pre_process(folder_path=rumour_path, cleanup=cleanup, subtasks=subtasks)
+        text_dict, parent_dict, embedding_dict = pre_process(folder_path=rumour_path, cleanup=cleanup,
+                                                             subtasks=subtasks)
 
         tweet_text_dict.update(text_dict)
         tweet_parent_dict.update(parent_dict)
@@ -148,26 +159,15 @@ def main(cleanup = False, subtasks=None):
 
 
 if __name__ == "__main__":
-    file_path1 = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-train.json")
-    file_path2 = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-dev.json")
+    file_paths = [os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-train.json"),
+                  os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-dev.json"),
+                  os.path.join("..", "res", "subtaska.json")]
     subtasks = {}
-    subtask1 = {}
-    subtask2 = {}
-    with open(file_path1) as json_file:
-        subtask1 = json.load(json_file)
-    with open(file_path2) as json_file:
-        subtask2 = json.load(json_file)
+    temp_subtasks = {}
 
-    subtasks.update(subtask1)
-    subtasks.update(subtask2)
+    for file_path in file_paths:
+        with open(file_path) as json_file:
+            temp_subtasks = json.load(json_file)
+        subtasks.update(temp_subtasks)
 
-
-    main(cleanup=False, subtasks=subtasks)
-    '''
-    list_string = ['BreakingNews',
-                   'australian',
-                   'JRCarrollCJ',
-                   'J_francis613',
-                   'COMINT_AU']
-    print(camelcase_split(list_string))
-    '''
+    main(cleanup=True, subtasks=subtasks)
