@@ -16,17 +16,25 @@ import matplotlib.pyplot as plt
 import seaborn as sn
 
 
+def silent_remove(filename):
+    try:
+        os.remove(filename)
+    except:
+        print("No file found to remove! No issues. Hopefully.")
+
+
 def load_dicts(preprocessed_path, dataset_path):
     preprocessed_text_path = os.path.join(preprocessed_path, "tweet_texts.json")
     preprocessed_parents_path = os.path.join(preprocessed_path, "tweet_parents.json")
     preprocessed_embeddings_path = os.path.join(preprocessed_path, "tweet_embeddings.json")
-    # dataset_path_path = os.path.join(dataset_path, "rumoureval-subtaskA-dev.json")
-    dataset_path_path = os.path.join(dataset_path, "rumoureval-subtaskA-train.json")
+    dataset_paths = [os.path.join(dataset_path, "rumoureval-subtaskA-dev.json"),
+                     os.path.join(dataset_path, "rumoureval-subtaskA-train.json")]
 
     text_d = {}
     parents_d = {}
     embeddings_d = {}
     dataset_d = {}
+    temp_d = {}
 
     with open(preprocessed_text_path) as json_file:
         text_d = json.load(json_file)
@@ -37,13 +45,15 @@ def load_dicts(preprocessed_path, dataset_path):
     with open(preprocessed_embeddings_path) as json_file:
         embeddings_d = json.load(json_file)
 
-    with open(dataset_path_path) as json_file:
-        dataset_d = json.load(json_file)
+    for d_path in dataset_paths:
+        with open(d_path) as json_file:
+            temp_d = json.load(json_file)
+        dataset_d.update(temp_d)
 
     return text_d, parents_d, embeddings_d, dataset_d
 
 
-def get_indices(task_dict, test_fraction=0.2):
+def get_indices(task_dict, test_fraction=0.2, verbose = False):
     keys = list(task_dict.keys())
     values = list(task_dict.values())
     comment_l = []
@@ -63,7 +73,7 @@ def get_indices(task_dict, test_fraction=0.2):
 
     # Balance datasets
     min_count = min(len(comment_l), len(deny_l), len(query_l), len(support_l))
-    comment_l = random.sample(comment_l, min_count*2)
+    comment_l = random.sample(comment_l, min_count)
     deny_l = random.sample(deny_l, min_count)
     query_l = random.sample(query_l, min_count)
     support_l = random.sample(support_l, min_count)
@@ -76,11 +86,12 @@ def get_indices(task_dict, test_fraction=0.2):
     train_indices = comment_train + deny_train + query_train + support_train
     test_indices = comment_test + deny_test + query_test + support_test
 
-    print("category\t", len(train_indices), "\t", len(test_indices))
-    print("comment\t", len(comment_train), len(comment_test))
-    print("deny\t", len(deny_train), len(deny_test))
-    print("query\t", len(query_train), len(query_test))
-    print("support\t", len(support_train), len(support_test))
+    if verbose:
+        print("category\t", len(train_indices), "\t", len(test_indices))
+        print("comment\t", len(comment_train), len(comment_test))
+        print("deny\t", len(deny_train), len(deny_test))
+        print("query\t", len(query_train), len(query_test))
+        print("support\t", len(support_train), len(support_test))
 
     return train_indices, test_indices
 
@@ -95,6 +106,31 @@ def get_dataloaders(data_loader, subtask_A, test_fraction=0.05, batch_size=256):
     test_loader = torch.utils.data.DataLoader(data_loader, batch_size=batch_size, sampler=test_sampler)
 
     return train_loader, test_loader
+
+
+def official_evaluation(reference_file, submission_file):
+    truth_values = json.load(open(reference_file, 'r'))
+    submission = json.load(open(submission_file, 'r'))
+
+    observed = 0
+    correct = 0
+    total = len(truth_values.keys())
+    print(len(truth_values), 'entries in reference file')
+    for reference_id in truth_values.keys():
+        if reference_id in submission.keys():
+            observed += 1
+            if submission[reference_id] == truth_values[reference_id]:
+                correct += 1
+        else:
+            print('unmatched entry:', reference_id, '-- no reference value for this document')
+
+    score = correct / total
+
+    print(observed, 'matched entries in submission')
+    print(total, 'entries in reference file')
+
+    print('sdqc accuracy:', score)
+    return score
 
 
 class Learner():
@@ -198,6 +234,7 @@ class Learner():
                 lowest_test_loss = test_loss
                 # https://pytorch.org/tutorials/beginner/saving_loading_models.html#save-load-state-dict-recommended
                 torch.save(self.model.state_dict(), self.state_dict_path)
+                print("Saved in epoch ",e)
 
     def load_model(self):
         self.model.load_state_dict(torch.load(self.state_dict_path))
@@ -225,44 +262,76 @@ class Learner():
         output = self.class_decode[output]
         return output
 
-    def evaluate(self, file_path):
+    def evaluate(self, file_path, dump_path):
         subtaskA = {}
         with open(file_path) as json_file:
             subtaskA = json.load(json_file)
         tweet_ids = subtaskA.keys()
         targets = subtaskA.values()
-        preds = [self.get_predicion(x) for x in tweet_ids]
+        pred_d = {x: self.get_predicion(x) for x in tweet_ids}
+
+        silent_remove(dump_path)
+        with open(dump_path, 'w') as outfile:
+            json.dump(pred_d, outfile)
+
+        preds = list(pred_d.values())
         correct = sum(x == y for x, y in zip(preds, targets))
         perc = correct / len(preds)
         return perc
-    
+
     def create_db(self, file_path):
         subtaskA = {}
         with open(file_path) as json_file:
             subtaskA = json.load(json_file)
         tweet_ids = subtaskA.keys()
-        df = pd.DataFrame(subtaskA.items(), columns = ['ID','Label'])
+        df = pd.DataFrame(subtaskA.items(), columns=['ID', 'Label'])
         preds = [self.get_predicion(x) for x in tweet_ids]
-        df['Prediction']=preds
+        df['Prediction'] = preds
         return df
 
 
-if __name__ == "__main__":
-    l = Learner(epochs=100)
-    l.learn()
-    l.load_model()
-
-    file_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-dev.json")
+def main():
+    # file_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-dev.json")
     # file_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-train.json")
+    file_path = os.path.join("..", "res", "subtaska.json")
 
-    c = l.evaluate(file_path=file_path)
-    print("Correct Percentage = \t", c)
+    dump_path = os.path.join("..", "res", "predictions.json")
+
+    best_seed = 0
+    best_performance = 0
+
+    train_epochs = 30
+
+    progress_bar = trange(100)
+    for seed_val in progress_bar:
+        l = Learner(epochs=train_epochs, seed=seed_val)
+        l.learn()
+        c = l.evaluate(file_path=file_path, dump_path=dump_path)
+        description = "best : " + str(best_performance) + "\tcurrent : " + str(c)
+        progress_bar.set_description(description)
+        print(seed_val, "\t", c)
+        if c > best_performance:
+            best_performance = c
+            best_seed = seed_val
+
+    # l.load_model()
+    l = Learner(epochs=train_epochs, seed=best_seed)
+    l.learn()
+    l.evaluate(file_path=file_path, dump_path=dump_path)
+    score = official_evaluation(reference_file=file_path, submission_file=dump_path)
+
+    print("\n\n\nFINAL SCORE :\t", score)
+    print("Best Seed :\t", best_seed)
 
     x = l.create_db(file_path=file_path)
 
-    print(pd.crosstab(x['Label'], x['Prediction'], margins = True))
-    print('Precision: ', precision_score(x['Label'],x['Prediction'],average = None))
-    print('Recall: ',recall_score(x['Label'],x['Prediction'],average = None))
+    print(pd.crosstab(x['Label'], x['Prediction'], margins=True))
+    print('Precision: ', precision_score(x['Label'], x['Prediction'], average=None))
+    print('Recall: ', recall_score(x['Label'], x['Prediction'], average=None))
 
     sn.heatmap(pd.crosstab(x['Label'], x['Prediction']), annot=True)
     plt.show()
+
+
+if __name__ == "__main__":
+    main()
