@@ -6,6 +6,9 @@ import re
 import errno
 
 
+from nltk.stem.snowball import SnowballStemmer
+
+
 def camelcase_split(list_string):
     splits = []
     for s in list_string:
@@ -27,19 +30,30 @@ def cleanify_tweet(tweet, id, parent_id="", subtasks=None, verbose = False):
         subtasks = defaultdict(str)
 
     clean_tweet = tweet
+    snow_stemmer = SnowballStemmer(language='english')
+    
     # remove @mentions
     mentions = re.findall("@([a-zA-Z0-9_]{1,50})", clean_tweet)
-    clean_tweet = re.sub("@[A-Za-z0-9_]+", "", clean_tweet)
+    clean_tweet = re.sub("@[A-Za-z0-9_]+", "@", clean_tweet)
 
     # remove #hashtags
     hashtags = re.findall("#([a-zA-Z0-9_]{1,50})", clean_tweet)
-    clean_tweet = re.sub("#[A-Za-z0-9_]+", "", clean_tweet)
+    #clean_tweet = re.sub("#[A-Za-z0-9_]+", "", clean_tweet)
 
     # remove http:// urls
-    # urls = re.findall(r'http\S{1,50}', "", tweet)
-    clean_tweet = re.sub(r'http\S+', "", clean_tweet)
+    #urls = re.findall(r'http\S{1,50}', "", tweet)
+    clean_tweet = re.sub(r'http\S+', "http:// ", clean_tweet)
+    
 
-    clean_tweet = " ".join(clean_tweet.split())
+    stemlist = []
+    tweetlist=clean_tweet.split()
+    for w in tweetlist:
+         x = snow_stemmer.stem(w)
+         stemlist.append(x)
+    clean_tweet= " ".join(stemlist)
+
+
+    #clean_tweet = " ".join(clean_tweet.split())
 
     # print("Mentions =\t", mentions)
     split_mentions = camelcase_split(mentions)
