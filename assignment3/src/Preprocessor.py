@@ -1,10 +1,13 @@
 import os
 from collections import defaultdict
 import json
-from sentence_transformers import SentenceTransformer
+import random
 import re
-import errno
-from nltk.stem.snowball import SnowballStemmer
+
+
+def set_all_seeds(seed):
+    # This is for reproducibility.
+    random.seed(seed)
 
 
 def camelcase_split(list_string):
@@ -28,7 +31,6 @@ def cleanify_tweet(tweet, id, parent_id="", subtasks=None, verbose=False):
         subtasks = defaultdict(str)
 
     clean_tweet = tweet
-    snow_stemmer = SnowballStemmer(language='english')
 
     # remove @mentions
     mentions = re.findall("@([a-zA-Z0-9_]{1,50})", clean_tweet)
@@ -36,20 +38,13 @@ def cleanify_tweet(tweet, id, parent_id="", subtasks=None, verbose=False):
 
     # remove #hashtags
     hashtags = re.findall("#([a-zA-Z0-9_]{1,50})", clean_tweet)
-    # clean_tweet = re.sub("#[A-Za-z0-9_]+", "", clean_tweet)
+    clean_tweet = re.sub("#[A-Za-z0-9_]+", "", clean_tweet)
 
     # remove http:// urls
     # urls = re.findall(r'http\S{1,50}', "", tweet)
     clean_tweet = re.sub(r'http\S+', "http:// ", clean_tweet)
 
-    stemlist = []
-    tweetlist = clean_tweet.split()
-    for w in tweetlist:
-        x = snow_stemmer.stem(w)
-        stemlist.append(x)
-    clean_tweet = " ".join(stemlist)
-
-    # clean_tweet = " ".join(clean_tweet.split())
+    clean_tweet = " ".join(clean_tweet.split())
 
     # print("Mentions =\t", mentions)
     split_mentions = camelcase_split(mentions)
@@ -150,6 +145,7 @@ def create_dicts(cleanup=False, subtasks=None):
     with open(parent_dump_path, 'w') as outfile:
         json.dump(tweet_parent_dict, outfile)
 
+
 def load_dicts():
     preprocessed_path = os.path.join("..", "res", "pre_processed")
     preprocessed_text_path = os.path.join(preprocessed_path, "tweet_texts.json")
@@ -166,8 +162,17 @@ def load_dicts():
 
     return text_d, parents_d
 
+
+def dump_training_files(text_list, path):
+    silentremove(path)
+    with open(path, "w+", encoding="utf-8") as file_object:
+        for line in text_list:
+            file_object.write(line)
+            file_object.write("\n")
+
+
 def create_training_data(subtasks):
-    root_path = os.path.join("res", "simple_classification_dataset", "data")
+    root_path = os.path.join("..","res", "simple_classification_dataset", "data")
 
     comment_list = []
     deny_list = []
@@ -179,14 +184,49 @@ def create_training_data(subtasks):
     text_d, parents_d = load_dicts()
     for tweet_id in subtasks:
         category = subtasks[tweet_id]
-        
+        if category == 'comment':
+            comment_list.append(text_d[tweet_id])
+        elif category == 'deny':
+            deny_list.append(text_d[tweet_id])
+        elif category == 'query':
+            query_list.append(text_d[tweet_id])
+        elif category == 'support':
+            support_list.append(text_d[tweet_id])
+
+    anti_support_list = deny_list + query_list
+    anti_comment_list = anti_support_list + support_list
+
+    # Balance Datasets here
+    comment_list = random.sample(comment_list, len(anti_comment_list))
+    support_list = random.sample(support_list, len(anti_support_list))
+
+    # comments
+    target_file_path = os.path.join(root_path, "comment", "comment.txt")
+    dump_training_files(text_list=comment_list, path=target_file_path)
+
+    target_file_path = os.path.join(root_path, "comment", "anti_comment.txt")
+    dump_training_files(text_list=anti_comment_list, path=target_file_path)
+
+    # support
+    target_file_path = os.path.join(root_path, "support", "support.txt")
+    dump_training_files(text_list=support_list, path=target_file_path)
+
+    target_file_path = os.path.join(root_path, "support", "anti_support.txt")
+    dump_training_files(text_list=anti_support_list, path=target_file_path)
+
+    # others
+    target_file_path = os.path.join(root_path, "other", "deny.txt")
+    dump_training_files(text_list=deny_list, path=target_file_path)
+
+    target_file_path = os.path.join(root_path, "other", "query.txt")
+    dump_training_files(text_list=query_list, path=target_file_path)
 
 
-
-
-def main(cleanup=True, subtasks=None):
+def main(cleanup=True, subtasks=None, train_only_tasks=None):
+    set_all_seeds(seed=99)
     create_dicts(cleanup=cleanup, subtasks=subtasks)
-    create_training_data(subtasks=subtasks)
+    print("dictionaries created")
+    create_training_data(subtasks=train_only_tasks)
 
 
 if __name__ == "__main__":
@@ -195,10 +235,19 @@ if __name__ == "__main__":
                   os.path.join("..", "res", "subtaska.json")]
     subtasks = {}
     temp_subtasks = {}
+    train_only_tasks = {}
 
     for file_path in file_paths:
         with open(file_path) as json_file:
             temp_subtasks = json.load(json_file)
         subtasks.update(temp_subtasks)
 
-    main(cleanup=True, subtasks=subtasks)
+    file_paths = [os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-train.json"),
+                  os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-dev.json")]
+
+    for file_path in file_paths:
+        with open(file_path) as json_file:
+            temp_subtasks = json.load(json_file)
+        train_only_tasks.update(temp_subtasks)
+
+    main(cleanup=True, subtasks=subtasks, train_only_tasks=train_only_tasks)
