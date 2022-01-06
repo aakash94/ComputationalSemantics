@@ -377,7 +377,7 @@ def main():
     best_seed = 0
     best_performance = 0
 
-    train_epochs = 100
+    train_epochs = 1000
 
     #progress_bar = trange(100)
     # for seed_val in progress_bar:
