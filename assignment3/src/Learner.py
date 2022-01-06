@@ -53,13 +53,14 @@ def load_dicts(preprocessed_path, dataset_path):
     return text_d, parents_d, embeddings_d, dataset_d
 
 
-def get_indices(task_dict, test_fraction=0.2, verbose = False):
+def get_indices(task_dict, test_fraction=0.2):
     keys = list(task_dict.keys())
     values = list(task_dict.values())
     comment_l = []
     deny_l = []
     query_l = []
     support_l = []
+    other_l = []
 
     for index, v in enumerate(values):
         if v == 'comment':
@@ -71,41 +72,53 @@ def get_indices(task_dict, test_fraction=0.2, verbose = False):
         elif v == 'support':
             support_l.append(index)
 
+    other_l = deny_l + query_l + support_l
+    len_comment = len(comment_l)
+    len_deny = len(deny_l)
+    len_query = len(query_l)
+    len_support = len(support_l)
+    len_other = len(other_l)
+
     # Balance datasets
     min_count = min(len(comment_l), len(deny_l), len(query_l), len(support_l))
-    comment_l = random.sample(comment_l, min_count)
+    comment_l = random.sample(comment_l, len_other)
     deny_l = random.sample(deny_l, min_count)
     query_l = random.sample(query_l, min_count)
     support_l = random.sample(support_l, min_count)
 
+    other_train, other_test = train_test_split(other_l, test_size=test_fraction, shuffle=True)
     comment_train, comment_test = train_test_split(comment_l, test_size=test_fraction, shuffle=True)
     deny_train, deny_test = train_test_split(deny_l, test_size=test_fraction, shuffle=True)
     query_train, query_test = train_test_split(query_l, test_size=test_fraction, shuffle=True)
     support_train, support_test = train_test_split(support_l, test_size=test_fraction, shuffle=True)
 
-    train_indices = comment_train + deny_train + query_train + support_train
-    test_indices = comment_test + deny_test + query_test + support_test
+    comment_train_i = comment_train + other_train
+    comment_test_i = comment_test + other_test
 
-    if verbose:
-        print("category\t", len(train_indices), "\t", len(test_indices))
-        print("comment\t", len(comment_train), len(comment_test))
-        print("deny\t", len(deny_train), len(deny_test))
-        print("query\t", len(query_train), len(query_test))
-        print("support\t", len(support_train), len(support_test))
+    other_train_i = deny_train + query_train + support_train
+    other_test_i = deny_test + query_test + support_test
 
-    return train_indices, test_indices
+    return comment_train_i, comment_test_i, other_train_i, other_test_i
 
 
-def get_dataloaders(data_loader, subtask_A, test_fraction=0.05, batch_size=256):
-    train_indices, test_indices = get_indices(subtask_A, test_fraction=test_fraction)
+def get_dataloaders(comment_data_loader, other_data_loader, subtask_A, test_fraction=0.05, batch_size=256):
+    comment_train_i, comment_test_i, other_train_i, other_test_i = get_indices(subtask_A, test_fraction=test_fraction)
 
-    train_sampler = SubsetRandomSampler(train_indices)
-    test_sampler = SubsetRandomSampler(test_indices)
+    comment_train_sampler = SubsetRandomSampler(comment_train_i)
+    other_train_sampler = SubsetRandomSampler(other_train_i)
+    comment_test_sampler = SubsetRandomSampler(comment_test_i)
+    other_test_sampler = SubsetRandomSampler(other_test_i)
 
-    train_loader = torch.utils.data.DataLoader(data_loader, batch_size=batch_size, sampler=train_sampler)
-    test_loader = torch.utils.data.DataLoader(data_loader, batch_size=batch_size, sampler=test_sampler)
+    comment_train_loader = torch.utils.data.DataLoader(comment_data_loader, batch_size=batch_size,
+                                                       sampler=comment_train_sampler)
+    comment_test_loader = torch.utils.data.DataLoader(comment_data_loader, batch_size=batch_size,
+                                                      sampler=comment_test_sampler)
+    other_train_loader = torch.utils.data.DataLoader(other_data_loader, batch_size=batch_size,
+                                                     sampler=other_train_sampler)
+    other_test_loader = torch.utils.data.DataLoader(other_data_loader, batch_size=batch_size,
+                                                    sampler=other_test_sampler)
 
-    return train_loader, test_loader
+    return comment_train_loader, comment_test_loader, other_train_loader, other_test_loader
 
 
 def official_evaluation(reference_file, submission_file):
@@ -140,74 +153,113 @@ class Learner():
         self.epochs = epochs
         preprocessed_path = os.path.join("..", "res", "pre_processed")
         dataset_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev")
-        self.state_dict_path = os.path.join("..", "res", "custom_model", "chk.pt")
+        self.comment_state_dict_path = os.path.join("..", "res", "custom_model", "comment_chk.pt")
+        self.other_state_dict_path = os.path.join("..", "res", "custom_model", "other_chk.pt")
 
-        class_encode = {
-            'comment': 0,
-            'deny': 1,
-            'query': 2,
-            'support': 3
+        other_class_encode = {
+            'deny': 0,
+            'query': 1,
+            'support': 2
         }
 
-        self.class_decode = {
+        self.other_class_decode = {
+            0: 'deny',
+            1: 'query',
+            2: 'support'
+        }
+        comment_class_encode = {
+            'comment': 0,
+            'deny': 1,
+            'query': 1,
+            'support': 1,
+            'other': 1
+        }
+
+        self.comment_class_decode = {
             0: 'comment',
-            1: 'deny',
-            2: 'query',
-            3: 'support'
+            1: 'other'
         }
 
         self.text_d, self.parents_d, self.embeddings_d, subtask_A = load_dicts(preprocessed_path=preprocessed_path,
                                                                                dataset_path=dataset_path)
 
-        self.data_loader = CustomDataLoader(embedding_dict=self.embeddings_d,
-                                            parent_dict=self.parents_d,
-                                            label_dict=subtask_A,
-                                            one_hot_dict=class_encode)
+        self.comment_data_loader = CustomDataLoader(embedding_dict=self.embeddings_d,
+                                                    parent_dict=self.parents_d,
+                                                    label_dict=subtask_A,
+                                                    one_hot_dict=comment_class_encode)
 
-        self.train_loader, self.test_loader = get_dataloaders(data_loader=self.data_loader, subtask_A=subtask_A)
+        self.other_data_loader = CustomDataLoader(embedding_dict=self.embeddings_d,
+                                                  parent_dict=self.parents_d,
+                                                  label_dict=subtask_A,
+                                                  one_hot_dict=other_class_encode)
 
-        if torch.cuda.is_available():
-            self.device = "cuda:0"
-        else:
-            self.device = "cpu"
+        self.comment_train_l, self.comment_test_l, self.other_train_l, self.other_test_l = get_dataloaders(
+            comment_data_loader=self.comment_data_loader, other_data_loader=self.other_data_loader, subtask_A=subtask_A)
 
-        self.model = TweetClassifier()
-        self.model.to(self.device)
+        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        #self.device = "cpu"
 
-        self.criterion = nn.CrossEntropyLoss()
+        self.comment_model = TweetClassifier(num_classes=2)
+        self.other_model = TweetClassifier(num_classes=3)
+        self.comment_model.to(self.device)
+        self.other_model.to(self.device)
+
+        self.comment_criterion = nn.CrossEntropyLoss()
+        self.other_criterion = nn.CrossEntropyLoss()
         # https://analyticsindiamag.com/ultimate-guide-to-pytorch-optimizers/
-        self.optimizer = torch.optim.Adam(self.model.parameters())
+        self.comment_optimizer = torch.optim.Adam(self.comment_model.parameters())
+        self.other_optimizer = torch.optim.Adam(self.other_model.parameters())
 
-    def run_on_dataloader(self, train=False):
-        if train:
-            self.model.train()
-            dataloader = self.train_loader
+    def run_on_dataloader(self, comments_classifier=False, train=False):
+        if comments_classifier:
+            current_model = self.comment_model
+            current_optimizer = self.comment_optimizer
+            crit = self.comment_criterion
+            if train:
+                current_dataloader = self.comment_train_l
+            else:
+                current_dataloader = self.comment_train_l
         else:
-            self.model.eval()
-            dataloader = self.test_loader
+            current_model = self.other_model
+            current_optimizer = self.other_optimizer
+            crit = self.other_criterion
+            if train:
+                current_dataloader = self.other_train_l
+            else:
+                current_dataloader = self.other_test_l
+
+        if train:
+            current_model.train()
+        else:
+            current_model.eval()
 
         total_loss = 0
         count = 0
-        for x, y in dataloader:
+        for x, y in current_dataloader:
             x = x.to(device=self.device)
             y = y.to(device=self.device)
 
             if train:
-                self.optimizer.zero_grad()
+                current_optimizer.zero_grad()
 
-            output = self.model(x)
+            output = current_model(x)
             # output = output.long()
             y = y.long()
-            loss = self.criterion(output, y)
+            loss = crit(output, y)
             total_loss += loss.item()
             count += 1
 
             if train:
                 loss.backward()
-                self.optimizer.step()
+                current_optimizer.step()
 
         if count > 0:
             total_loss /= count
+
+        if comments_classifier:
+            self.comment_model = current_model
+        else:
+            self.other_model = current_model
 
         return total_loss
 
@@ -217,29 +269,45 @@ class Learner():
         np.random.seed(seed)
         torch.manual_seed(seed)
         torch.cuda.manual_seed(seed)
-        torch.backends.cudnn.deterministic = True
 
-    def learn(self):
-        writer = SummaryWriter(comment='Veracity')
+    def learn(self, comment_classifier=False):
+        if comment_classifier:
+            TAG = "Comment"
+        else:
+            TAG = "Other"
+
+        writer = SummaryWriter(comment=TAG)
+
         TRAIN_LOSS = "train_loss"
         TEST_LOSS = "test_loss"
         lowest_test_loss = np.inf
-        for e in trange(self.epochs):
-            train_loss = self.run_on_dataloader(train=True)
+        progress_bar = trange(self.epochs)
+        for e in progress_bar:
+            train_loss = self.run_on_dataloader(comments_classifier=comment_classifier, train=True)
             writer.add_scalar(TRAIN_LOSS, train_loss, e)
-            test_loss = self.run_on_dataloader(train=False)
+            test_loss = self.run_on_dataloader(comments_classifier=comment_classifier, train=False)
             writer.add_scalar(TEST_LOSS, test_loss, e)
 
             if test_loss < lowest_test_loss:
                 lowest_test_loss = test_loss
                 # https://pytorch.org/tutorials/beginner/saving_loading_models.html#save-load-state-dict-recommended
-                torch.save(self.model.state_dict(), self.state_dict_path)
+                if comment_classifier:
+                    torch.save(self.comment_model.state_dict(), self.comment_state_dict_path)
+                else:
+                    torch.save(self.other_model.state_dict(), self.other_state_dict_path)
                 # print("Saved in epoch ",e)
 
+            description = TAG + "\tlowest test loss : " + str(lowest_test_loss) + "\tcurrent test loss: " + str(
+                test_loss)
+            progress_bar.set_description(description)
+
     def load_model(self):
-        self.model.load_state_dict(torch.load(self.state_dict_path))
-        self.model.to(self.device)
-        self.model.eval()
+        self.comment_model.load_state_dict(torch.load(self.comment_state_dict_path))
+        self.comment_model.to(self.device)
+        self.comment_model.eval()
+        self.other_model.load_state_dict(torch.load(self.other_state_dict_path))
+        self.other_model.to(self.device)
+        self.other_model.eval()
 
     def get_parents(self, tweet_id):
         parents = []
@@ -253,13 +321,22 @@ class Learner():
     def get_predicion(self, tweet_id):
         if tweet_id not in self.embeddings_d:
             return ""
-        embedding = self.data_loader.get_embeddings_from_id(tweet_id)
+        embedding = self.comment_data_loader.get_embeddings_from_id(tweet_id)
         embedding = embedding.to(device=self.device)
-        logits = self.model(embedding)
+        logits = self.comment_model(embedding)
         output = torch.argmax(logits)
         output = output.cpu()
         output = output.item()
-        output = self.class_decode[output]
+        if output == 0:
+            # it is comment
+            output = self.comment_class_decode[output]
+        else:
+            logits = self.other_model(embedding)
+            output = torch.argmax(logits)
+            output = output.cpu()
+            output = output.item()
+            output = self.other_class_decode[output]
+
         return output
 
     def evaluate(self, file_path, dump_path):
@@ -300,24 +377,28 @@ def main():
     best_seed = 0
     best_performance = 0
 
-    train_epochs = 30
+    train_epochs = 100
 
-    progress_bar = trange(100)
-    for seed_val in progress_bar:
+    #progress_bar = trange(100)
+    # for seed_val in progress_bar:
+    seed_val = 47
+    if True:
         l = Learner(epochs=train_epochs, seed=seed_val)
-        l.learn()
+        l.learn(comment_classifier=True)
+        l.learn(comment_classifier=False)
         c = l.evaluate(file_path=file_path, dump_path=dump_path)
         description = "best : " + str(best_performance) + "\tcurrent : " + str(c)
-        progress_bar.set_description(description)
+        # progress_bar.set_description(description)
+        print(description)
         # print(seed_val, "\t", c)
         if c > best_performance:
             best_performance = c
             best_seed = seed_val
 
-    # l.load_model()
-    l = Learner(epochs=train_epochs, seed=best_seed)
-    l.learn()
-    l.evaluate(file_path=file_path, dump_path=dump_path)
+    l.load_model()
+    # l = Learner(epochs=train_epochs, seed=best_seed)
+    # l.learn()
+    # l.evaluate(file_path=file_path, dump_path=dump_path)
     score = official_evaluation(reference_file=file_path, submission_file=dump_path)
 
     print("\n\n\nFINAL SCORE :\t", score)
