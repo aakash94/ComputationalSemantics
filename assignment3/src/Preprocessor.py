@@ -123,7 +123,7 @@ def pre_process(folder_path, cleanup=False, subtasks=None):
     return tweet_text_dict, tweet_parent_dict
 
 
-def main(cleanup=False, subtasks=None):
+def create_dicts(cleanup=False, subtasks=None):
     if subtasks is None:
         subtasks = defaultdict(str)
     data_path = os.path.join("..", "res", "semeval2017-task8-dataset", "rumoureval-data")
@@ -149,6 +149,44 @@ def main(cleanup=False, subtasks=None):
     silentremove(parent_dump_path)
     with open(parent_dump_path, 'w') as outfile:
         json.dump(tweet_parent_dict, outfile)
+
+def load_dicts():
+    preprocessed_path = os.path.join("..", "res", "pre_processed")
+    preprocessed_text_path = os.path.join(preprocessed_path, "tweet_texts.json")
+    preprocessed_parents_path = os.path.join(preprocessed_path, "tweet_parents.json")
+
+    text_d = {}
+    parents_d = {}
+
+    with open(preprocessed_text_path) as json_file:
+        text_d = json.load(json_file)
+
+    with open(preprocessed_parents_path) as json_file:
+        parents_d = json.load(json_file)
+
+    return text_d, parents_d
+
+def create_training_data(subtasks):
+    root_path = os.path.join("res", "simple_classification_dataset", "data")
+
+    comment_list = []
+    deny_list = []
+    query_list = []
+    support_list = []
+    anti_comment_list = []
+    anti_support_list = []
+
+    text_d, parents_d = load_dicts()
+    for tweet_id in subtasks:
+        category = subtasks[tweet_id]
+        
+
+
+
+
+def main(cleanup=True, subtasks=None):
+    create_dicts(cleanup=cleanup, subtasks=subtasks)
+    create_training_data(subtasks=subtasks)
 
 
 if __name__ == "__main__":
