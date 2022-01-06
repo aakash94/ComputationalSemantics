@@ -148,9 +148,10 @@ def official_evaluation(reference_file, submission_file):
 
 class Learner():
 
-    def __init__(self, epochs=500, seed=42):
+    def __init__(self, comment_epochs=1000, other_epoch=100, seed=42):
         self.set_all_seeds(seed=seed)
-        self.epochs = epochs
+        self.comment_epochs = comment_epochs
+        self.other_epochs = other_epoch
         preprocessed_path = os.path.join("..", "res", "pre_processed")
         dataset_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev")
         self.comment_state_dict_path = os.path.join("..", "res", "custom_model", "comment_chk.pt")
@@ -197,7 +198,7 @@ class Learner():
             comment_data_loader=self.comment_data_loader, other_data_loader=self.other_data_loader, subtask_A=subtask_A)
 
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        #self.device = "cpu"
+        # self.device = "cpu"
 
         self.comment_model = TweetClassifier(num_classes=2)
         self.other_model = TweetClassifier(num_classes=3)
@@ -273,15 +274,17 @@ class Learner():
     def learn(self, comment_classifier=False):
         if comment_classifier:
             TAG = "Comment"
+            epochs = self.comment_epochs
         else:
             TAG = "Other"
+            epochs = self.other_epochs
 
         writer = SummaryWriter(comment=TAG)
 
         TRAIN_LOSS = "train_loss"
         TEST_LOSS = "test_loss"
         lowest_test_loss = np.inf
-        progress_bar = trange(self.epochs)
+        progress_bar = trange(epochs)
         for e in progress_bar:
             train_loss = self.run_on_dataloader(comments_classifier=comment_classifier, train=True)
             writer.add_scalar(TRAIN_LOSS, train_loss, e)
@@ -377,13 +380,14 @@ def main():
     best_seed = 0
     best_performance = 0
 
-    train_epochs = 1000
+    comment_train_epochs = 10
+    other_tain_epochs = 10
 
-    #progress_bar = trange(100)
+    # progress_bar = trange(100)
     # for seed_val in progress_bar:
     seed_val = 47
     if True:
-        l = Learner(epochs=train_epochs, seed=seed_val)
+        l = Learner(comment_epochs=comment_train_epochs, other_epoch=other_tain_epochs, seed=seed_val)
         l.learn(comment_classifier=True)
         l.learn(comment_classifier=False)
         c = l.evaluate(file_path=file_path, dump_path=dump_path)
