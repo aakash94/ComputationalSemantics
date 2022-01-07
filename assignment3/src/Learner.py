@@ -1,176 +1,41 @@
-import numpy as np
-import torch.nn as nn
-from torch.utils.data.sampler import SubsetRandomSampler
 import os
+import logging
+import pandas as pd
+import numpy as np
 import random
-import json
-from Classifier9001 import TweetClassifier
-from DataLoader import CustomDataLoader
 import torch
-from torch.utils.tensorboard import SummaryWriter
-from tqdm import trange
+from happytransformer import HappyTextClassification
 from sklearn.model_selection import train_test_split
 
 
-def load_dicts(preprocessed_path, dataset_path):
-    preprocessed_text_path = os.path.join(preprocessed_path, "tweet_texts.json")
-    preprocessed_parents_path = os.path.join(preprocessed_path, "tweet_parents.json")
-    preprocessed_embeddings_path = os.path.join(preprocessed_path, "tweet_embeddings.json")
-    # dataset_path_path = os.path.join(dataset_path, "rumoureval-subtaskA-dev.json")
-    dataset_path_path = os.path.join(dataset_path, "rumoureval-subtaskA-train.json")
-
-    text_d = {}
-    parents_d = {}
-    embeddings_d = {}
-    dataset_d = {}
-
-    with open(preprocessed_text_path) as json_file:
-        text_d = json.load(json_file)
-
-    with open(preprocessed_parents_path) as json_file:
-        parents_d = json.load(json_file)
-
-    with open(preprocessed_embeddings_path) as json_file:
-        embeddings_d = json.load(json_file)
-
-    with open(dataset_path_path) as json_file:
-        dataset_d = json.load(json_file)
-
-    return text_d, parents_d, embeddings_d, dataset_d
+def silentremove(filename):
+    try:
+        os.remove(filename)
+    except:
+        print("No file found to remove! No issues. Hopefully.")
 
 
-def get_indices(task_dict, test_fraction=0.2):
-    keys = list(task_dict.keys())
-    values = list(task_dict.values())
-    comment_l = []
-    deny_l = []
-    query_l = []
-    support_l = []
+class TweetClassifier:
 
-    for index, v in enumerate(values):
-        if v == 'comment':
-            comment_l.append(index)
-        elif v == 'deny':
-            deny_l.append(index)
-        elif v == 'query':
-            query_l.append(index)
-        elif v == 'support':
-            support_l.append(index)
-
-    # Balance datasets
-    min_count = min(len(comment_l), len(deny_l), len(query_l), len(support_l))
-    comment_l = random.sample(comment_l, min_count)
-    deny_l = random.sample(deny_l, min_count)
-    query_l = random.sample(query_l, min_count)
-    support_l = random.sample(support_l, min_count)
-
-    comment_train, comment_test = train_test_split(comment_l, test_size=test_fraction, shuffle=True)
-    deny_train, deny_test = train_test_split(deny_l, test_size=test_fraction, shuffle=True)
-    query_train, query_test = train_test_split(query_l, test_size=test_fraction, shuffle=True)
-    support_train, support_test = train_test_split(support_l, test_size=test_fraction, shuffle=True)
-
-    train_indices = comment_train + deny_train + query_train + support_train
-    test_indices = comment_test + deny_test + query_test + support_test
-
-    print("category\t", len(train_indices), "\t", len(test_indices))
-    print("comment\t", len(comment_train), len(comment_test))
-    print("deny\t", len(deny_train), len(deny_test))
-    print("query\t", len(query_train), len(query_test))
-    print("support\t", len(support_train), len(support_test))
-
-    return train_indices, test_indices
-
-
-def get_dataloaders(data_loader, subtask_A, test_fraction=0.2, batch_size=32):
-    train_indices, test_indices = get_indices(subtask_A, test_fraction=test_fraction)
-
-    train_sampler = SubsetRandomSampler(train_indices)
-    test_sampler = SubsetRandomSampler(test_indices)
-
-    train_loader = torch.utils.data.DataLoader(data_loader, batch_size=batch_size, sampler=train_sampler)
-    test_loader = torch.utils.data.DataLoader(data_loader, batch_size=batch_size, sampler=test_sampler)
-
-    return train_loader, test_loader
-
-
-class Learner():
-
-    def __init__(self, epochs=500, seed=42):
+    def __init__(self, classifier_name, seed=42):
+        logging.debug("Initializing intent helper")
         self.set_all_seeds(seed=seed)
-        self.epochs = epochs
-        preprocessed_path = os.path.join("..", "res", "pre_processed")
-        dataset_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev")
-        self.state_dict_path = os.path.join("..", "res", "custom_model", "chk.pt")
+        self.max_seq_len = 256
+        res_path = os.path.join("..", "res", "simple_classification_dataset", "")
+        self.data_path = os.path.join(res_path, "data", classifier_name, "")
+        self.train_csv_file_path = os.path.join(res_path, "tmp", classifier_name, "DoNotTouch_Train.csv")
+        self.test_csv_file_path = os.path.join(res_path, "tmp", classifier_name, "DoNotTouch_Test.csv")
+        self.model_path = os.path.join(res_path, "custom_model", classifier_name, "")
+        logging.debug("reading classes")
+        self.classes = [os.path.splitext(filename)[0] for filename in os.listdir(self.data_path)]
+        self.mapping = {k: v for v, k in enumerate(self.classes)}
 
-        class_encode = {
-            'comment': 0,
-            'deny': 1,
-            'query': 2,
-            'support': 3
-        }
+        logging.debug("creating model")
+        self.model = HappyTextClassification(model_type="DISTILBERT",
+                                             model_name="distilbert-base-uncased",
+                                             num_labels=len(self.classes))
 
-        self.class_decode = {
-            0: 'comment',
-            1: 'deny',
-            2: 'query',
-            3: 'support'
-        }
-
-        self.text_d, self.parents_d, self.embeddings_d, subtask_A = load_dicts(preprocessed_path=preprocessed_path,
-                                                                               dataset_path=dataset_path)
-
-        self.data_loader = CustomDataLoader(embedding_dict=self.embeddings_d,
-                                            parent_dict=self.parents_d,
-                                            label_dict=subtask_A,
-                                            one_hot_dict=class_encode)
-
-        self.train_loader, self.test_loader = get_dataloaders(data_loader=self.data_loader,
-                                                              subtask_A=subtask_A)
-
-        if torch.cuda.is_available():
-            self.device = "cuda:0"
-        else:
-            self.device = "cpu"
-
-        self.model = TweetClassifier()
-        self.model.to(self.device)
-
-        self.criterion = nn.CrossEntropyLoss()
-        # https://analyticsindiamag.com/ultimate-guide-to-pytorch-optimizers/
-        self.optimizer = torch.optim.Adam(self.model.parameters())
-
-    def run_on_dataloader(self, train=False):
-        if train:
-            self.model.train()
-            dataloader = self.train_loader
-        else:
-            self.model.eval()
-            dataloader = self.test_loader
-
-        total_loss = 0
-        count = 0
-        for x, y in dataloader:
-            x = x.to(device=self.device)
-            y = y.to(device=self.device)
-
-            if train:
-                self.optimizer.zero_grad()
-
-            output = self.model(x)
-            # output = output.long()
-            y = y.long()
-            loss = self.criterion(output, y)
-            total_loss += loss.item()
-            count += 1
-
-            if train:
-                loss.backward()
-                self.optimizer.step()
-
-        if count > 0:
-            total_loss /= count
-
-        return total_loss
+        logging.info("Initialization Complete")
 
     def set_all_seeds(self, seed):
         # This is for reproducibility.
@@ -178,67 +43,86 @@ class Learner():
         np.random.seed(seed)
         torch.manual_seed(seed)
         torch.cuda.manual_seed(seed)
-        torch.backends.cudnn.deterministic = True
 
-    def learn(self):
-        writer = SummaryWriter(comment='Veracity')
-        TRAIN_LOSS = "train_loss"
-        TEST_LOSS = "test_loss"
-        lowest_test_loss = np.inf
-        for e in trange(self.epochs):
-            train_loss = self.run_on_dataloader(train=True)
-            writer.add_scalar(TRAIN_LOSS, train_loss, e)
-            test_loss = self.run_on_dataloader(train=False)
-            writer.add_scalar(TEST_LOSS, test_loss, e)
+    def process_training_data(self, test_size=0.1, verbose=False):
+        TEXT = "text"
+        LABEL = "label"
+        header = [TEXT, LABEL]
 
-            if test_loss < lowest_test_loss:
-                lowest_test_loss = test_loss
-                # https://pytorch.org/tutorials/beginner/saving_loading_models.html#save-load-state-dict-recommended
-                torch.save(self.model.state_dict(), self.state_dict_path)
+        train_dataset = pd.DataFrame(columns=header)
+        test_dataset = pd.DataFrame(columns=header)
+        for c in self.classes:
+            txt = []
+            class_label = self.mapping[c]
+            file_path = self.data_path + c + ".txt"
+            with open(file_path, encoding="utf-8") as fp:
+                for line in fp:
+                    txt.append(line)
+
+            train_l, test_l = train_test_split(txt, test_size=test_size, shuffle=True)
+            # intent_l = [c] * len(train_l)
+            intent_l = [class_label] * len(train_l)
+            df_temp = pd.DataFrame(list(zip(train_l, intent_l)), columns=header)
+            train_dataset = train_dataset.append(df_temp, ignore_index=True)
+
+            # intent_l = [c] * len(test_l)
+            intent_l = [class_label] * len(test_l)
+            df_temp = pd.DataFrame(list(zip(test_l, intent_l)), columns=header)
+            test_dataset = test_dataset.append(df_temp, ignore_index=True)
+
+        train_dataset = train_dataset.sample(frac=1)
+        test_dataset = test_dataset.sample(frac=1)
+
+        train_dataset = train_dataset.reset_index(drop=True)
+        test_dataset = test_dataset.reset_index(drop=True)
+
+        # DUMP DO_NOT_TOUCH CSVs
+        silentremove(self.train_csv_file_path)
+        silentremove(self.test_csv_file_path)
+        train_dataset.to_csv(self.train_csv_file_path, index=False)
+        test_dataset.to_csv(self.test_csv_file_path, index=False)
+
+        if verbose:
+            print(self.classes)
+            print(train_dataset)
+            print(test_dataset)
+
+    def train_model(self, test_size=0.1, preprocess_data=True, verbose=False):
+        if preprocess_data:
+            logging.info("Preprocessing Data")
+            self.process_training_data(test_size=test_size)
+            logging.info("Preprocessing Done")
+        # args = TCTrainArgs(num_train_epochs=5)
+        logging.info("Training Model")
+        self.model.train(self.train_csv_file_path)
+        result = self.model.eval(self.test_csv_file_path)
+        logging.info("Training Done. Result = ", result)
+        logging.info("Saving Model")
+        self.model.save(self.model_path)
+        logging.info("Model Saved")
+        if verbose:
+            print(result)
 
     def load_model(self):
-        self.model.load_state_dict(torch.load(self.state_dict_path))
-        self.model.to(self.device)
-        self.model.eval()
+        logging.info("Loading Model")
+        self.model = HappyTextClassification(load_path=self.model_path, num_labels=len(self.classes))
+        logging.info("Model Loaded")
 
-    def get_parents(self, tweet_id):
-        parents = []
-        x = self.parents_d[tweet_id]
-        while x != '':
-            parents.insert(0, x)
-            x = self.parents_d[x]
+    def predict(self, sentence, verbose=False):
+        logging.info("Predicting")
+        sentence = sentence.replace(",", " ")
+        p = self.model.classify_text(sentence)
+        pred = int(p.label.split('_')[-1])
+        prediction = self.classes[pred]
+        logging.info(prediction, " ", p.score, "\t", sentence)
+        if verbose:
+            print(prediction, " ", p.score, "\t", sentence)
 
-        return parents
-
-    def get_predicion(self, tweet_id):
-        embedding = self.data_loader.get_embeddings_from_id(tweet_id)
-        embedding = embedding.to(device=self.device)
-        logits = self.model(embedding)
-        output = torch.argmax(logits)
-        output = output.cpu()
-        output = output.item()
-        output = self.class_decode[output]
-        return output
-
-    def evaluate(self, file_path):
-        subtaskA = {}
-        with open(file_path) as json_file:
-            subtaskA = json.load(json_file)
-        tweet_ids = subtaskA.keys()
-        targets = subtaskA.values()
-        preds = [self.get_predicion(x) for x in tweet_ids]
-        correct = sum(x == y for x, y in zip(preds, targets))
-        perc = correct / len(preds)
-        return perc
+        return prediction
 
 
 if __name__ == "__main__":
-    l = Learner(epochs=500)
-    l.learn()
-    l.load_model()
-
-    file_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-dev.json")
-    # file_path = os.path.join("..", "res", "semeval2017-task8-dataset", "traindev", "rumoureval-subtaskA-train.json")
-
-    c = l.evaluate(file_path=file_path)
-    print("Correct Percentage = \t", c)
+    seed = 42
+    comment_classifier = TweetClassifier(classifier_name="comment", seed=42)
+    comment_classifier.train_model()
+    comment_classifier.load_model()
