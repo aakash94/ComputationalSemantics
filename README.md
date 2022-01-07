@@ -20,3 +20,16 @@ model = AutoModel.from_pretrained("/content/transformers4vl-vilbert",output_hidd
 ```
 
 The above snippet is designed for Colab, and with suitable tweaks will work on local machine. 
+
+### For Assignment 3
+
+Check [CommentOnly](https://github.com/aakash94/ComputationalSemantics/tree/CommentOnly) branch for best performance.
+Make sure following libraries are installed.
+- Pandas
+- Numpy
+- Torch
+- HuggingFace
+- HappyTransformer
+- Sklearn
+- Seaborn
+- Matplotlib
