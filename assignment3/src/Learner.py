@@ -130,6 +130,3 @@ class TweetClassifier:
 
 if __name__ == "__main__":
     seed = 42
-    comment_classifier = TweetClassifier(classifier_name="comment", seed=42)
-    comment_classifier.train_model()
-    comment_classifier.load_model()
