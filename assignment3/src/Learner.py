@@ -15,6 +15,12 @@ def silentremove(filename):
         print("No file found to remove! No issues. Hopefully.")
 
 
+def create_dir(dir_path):
+    if os.path.exists(dir_path):
+        return
+    os.makedirs(dir_path)
+
+
 class TweetClassifier:
 
     def __init__(self, classifier_name, seed=42):
@@ -26,6 +32,7 @@ class TweetClassifier:
         self.train_csv_file_path = os.path.join(res_path, "tmp", classifier_name, "DoNotTouch_Train.csv")
         self.test_csv_file_path = os.path.join(res_path, "tmp", classifier_name, "DoNotTouch_Test.csv")
         self.model_path = os.path.join(res_path, "custom_model", classifier_name, "")
+        create_dir(self.model_path)
         logging.debug("reading classes")
         self.classes = [os.path.splitext(filename)[0] for filename in os.listdir(self.data_path)]
         self.mapping = {k: v for v, k in enumerate(self.classes)}
